@@ -189,7 +189,7 @@ function LoginContent() {
               />
             </div>
             <h1 className="text-lg font-bold text-gray-800 tracking-tight">
-              CV Aswi Sentosa
+              CV Aswi Sentosa Lampung
             </h1>
             <p className="text-xs text-gray-500 mt-0.5">
               Sistem Absensi & Inventory
