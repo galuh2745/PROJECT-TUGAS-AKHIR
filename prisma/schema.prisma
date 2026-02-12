@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,6 +5,231 @@ generator client {
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  BigInt    @id @default(autoincrement())
+  name                String    @db.VarChar(255)
+  email               String?   @db.VarChar(255)
+  password            String    @db.VarChar(255)
+  role                Role      @default(USER)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  need_password_reset Boolean   @default(false)
+  reset_requested_at  DateTime?
+  karyawan            Karyawan?
+
+  @@map("users")
+}
+
+model JenisKaryawan {
+  id                  BigInt     @id @default(autoincrement())
+  nama_jenis          String     @db.VarChar(255)
+  jam_masuk           DateTime   @db.Time(0)
+  jam_pulang          DateTime   @db.Time(0)
+  created_at          DateTime   @default(now())
+  updated_at          DateTime   @updatedAt
+  toleransi_terlambat Int        @default(15)
+  karyawan            Karyawan[]
+
+  @@map("jenis_karyawan")
+}
+
+model Karyawan {
+  id                BigInt         @id @default(autoincrement())
+  user_id           BigInt         @unique
+  nip               String         @unique @db.VarChar(50)
+  nama              String         @db.VarChar(255)
+  jenis_karyawan_id BigInt
+  no_hp             String         @db.VarChar(20)
+  alamat            String         @db.Text
+  status            StatusKaryawan @default(AKTIF)
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+  absensi           Absensi[]
+  izin_cuti         IzinCuti[]
+  jenis_karyawan    JenisKaryawan  @relation(fields: [jenis_karyawan_id], references: [id])
+  user              User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  lembur            Lembur[]
+
+  @@index([user_id])
+  @@index([jenis_karyawan_id])
+  @@map("karyawan")
+}
+
+model Absensi {
+  id          BigInt        @id @default(autoincrement())
+  karyawan_id BigInt
+  tanggal     DateTime      @db.Date
+  jam_masuk   DateTime?     @db.Time(0)
+  jam_pulang  DateTime?     @db.Time(0)
+  status      StatusAbsensi
+  latitude    Decimal?      @db.Decimal(10, 8)
+  longitude   Decimal?      @db.Decimal(11, 8)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  foto_masuk  String?       @db.VarChar(500)
+  foto_pulang String?       @db.VarChar(500)
+  karyawan    Karyawan      @relation(fields: [karyawan_id], references: [id], onDelete: Cascade)
+
+  @@index([karyawan_id])
+  @@index([tanggal])
+  @@map("absensi")
+}
+
+model IzinCuti {
+  id              BigInt         @id @default(autoincrement())
+  karyawan_id     BigInt
+  jenis           JenisIzinCuti
+  tanggal_mulai   DateTime       @db.Date
+  tanggal_selesai DateTime       @db.Date
+  alasan          String         @db.Text
+  status          StatusIzinCuti @default(PENDING)
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+  karyawan        Karyawan       @relation(fields: [karyawan_id], references: [id], onDelete: Cascade)
+
+  @@index([karyawan_id])
+  @@map("izin_cuti")
+}
+
+model Lembur {
+  id          BigInt   @id @default(autoincrement())
+  karyawan_id BigInt
+  tanggal     DateTime @db.Date
+  jam_mulai   DateTime @db.Time(0)
+  jam_selesai DateTime @db.Time(0)
+  total_jam   Decimal  @db.Decimal(4, 2)
+  keterangan  String   @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  karyawan    Karyawan @relation(fields: [karyawan_id], references: [id], onDelete: Cascade)
+
+  @@index([karyawan_id])
+  @@map("lembur")
+}
+
+model AyamMati {
+  id            BigInt           @id @default(autoincrement())
+  perusahaan_id BigInt
+  tanggal       DateTime         @db.Date
+  jumlah_ekor   Int
+  keterangan    String?          @db.Text
+  status_claim  StatusClaim
+  created_at    DateTime         @default(now())
+  updated_at    DateTime         @updatedAt
+  perusahaan    Perusahaan       @relation(fields: [perusahaan_id], references: [id], onDelete: Cascade)
+
+  @@index([perusahaan_id])
+  @@index([tanggal])
+  @@map("ayam_mati")
+}
+
+model BarangKeluarAyamHidup {
+  id              BigInt     @id @default(autoincrement())
+  perusahaan_id   BigInt
+  tanggal         DateTime   @db.Date
+  nama_customer   String     @db.VarChar(255)
+  jumlah_ekor     Int
+  total_kg        Decimal    @db.Decimal(10, 2)
+  jenis_daging    String     @default("BESAR") @db.VarChar(10)
+  harga_per_kg    Decimal    @db.Decimal(12, 2)
+  total_penjualan Decimal    @db.Decimal(15, 2)
+  pengeluaran     Decimal    @default(0.00) @db.Decimal(15, 2)
+  total_bersih    Decimal    @default(0.00) @db.Decimal(15, 2)
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
+  perusahaan      Perusahaan @relation(fields: [perusahaan_id], references: [id], onDelete: Cascade)
+
+  @@index([perusahaan_id])
+  @@index([tanggal])
+  @@map("barang_keluar_ayam_hidup")
+}
+
+model BarangKeluarDaging {
+  id                          BigInt                       @id @default(autoincrement())
+  perusahaan_id               BigInt?
+  tanggal                     DateTime                     @db.Date
+  nama_customer               String                       @db.VarChar(255)
+  total_penjualan             Decimal                      @default(0.00) @db.Decimal(15, 2)
+  pengeluaran                 Decimal                      @default(0.00) @db.Decimal(15, 2)
+  saldo                       Decimal                      @default(0.00) @db.Decimal(15, 2)
+  keterangan                  String?                      @db.Text
+  created_at                  DateTime                     @default(now())
+  updated_at                  DateTime                     @updatedAt
+  perusahaan                  Perusahaan?                  @relation(fields: [perusahaan_id], references: [id])
+  details                     BarangKeluarDagingDetail[]
+
+  @@index([perusahaan_id])
+  @@index([tanggal])
+  @@map("barang_keluar_daging")
+}
+
+model BarangKeluarDagingDetail {
+  id                      BigInt              @id @default(autoincrement())
+  barang_keluar_daging_id BigInt
+  jenis_daging_id         BigInt
+  berat_kg                Decimal             @db.Decimal(10, 2)
+  harga_per_kg            Decimal             @db.Decimal(15, 2)
+  subtotal                Decimal             @db.Decimal(15, 2)
+  created_at              DateTime            @default(now())
+  barang_keluar_daging    BarangKeluarDaging  @relation(fields: [barang_keluar_daging_id], references: [id], onDelete: Cascade)
+  jenis_daging            JenisDaging         @relation(fields: [jenis_daging_id], references: [id])
+
+  @@index([barang_keluar_daging_id])
+  @@index([jenis_daging_id])
+  @@map("barang_keluar_daging_detail")
+}
+
+model BarangMasuk {
+  id                 BigInt     @id @default(autoincrement())
+  perusahaan_id      BigInt
+  tanggal_masuk      DateTime   @db.Date
+  jumlah_ekor        Int
+  total_kg           Decimal    @db.Decimal(10, 2)
+  bw                 Decimal    @db.Decimal(6, 3)
+  harga_per_kg       Decimal    @db.Decimal(12, 2)
+  total_harga        Decimal    @db.Decimal(15, 2)
+  tanggal_pembayaran DateTime?  @db.Date
+  jumlah_transfer    Decimal    @default(0.00) @db.Decimal(15, 2)
+  saldo_kita         Decimal    @db.Decimal(15, 2)
+  nama_kandang       String     @db.VarChar(255)
+  alamat_kandang     String?    @db.Text
+  no_mobil           String?    @db.VarChar(50)
+  nama_supir         String?    @db.VarChar(255)
+  created_at         DateTime   @default(now())
+  updated_at         DateTime   @updatedAt
+  perusahaan         Perusahaan @relation(fields: [perusahaan_id], references: [id], onDelete: Cascade)
+
+  @@index([perusahaan_id])
+  @@index([tanggal_masuk])
+  @@map("barang_masuk")
+}
+
+model JenisDaging {
+  id                          BigInt                        @id @default(autoincrement())
+  nama_jenis                  String                        @db.VarChar(100)
+  aktif                       Boolean                       @default(true)
+  created_at                  DateTime                      @default(now())
+  updated_at                  DateTime                      @updatedAt
+  barang_keluar_daging_detail BarangKeluarDagingDetail[]
+
+  @@map("jenis_daging")
+}
+
+model Perusahaan {
+  id                       BigInt                      @id @default(autoincrement())
+  nama_perusahaan          String                      @db.VarChar(255)
+  alamat                   String?                     @db.Text
+  kontak                   String?                     @db.VarChar(100)
+  created_at               DateTime                    @default(now())
+  updated_at               DateTime                    @updatedAt
+  ayam_mati                AyamMati[]
+  barang_keluar_ayam_hidup BarangKeluarAyamHidup[]
+  barang_keluar_daging     BarangKeluarDaging[]
+  barang_masuk             BarangMasuk[]
+
+  @@map("perusahaan")
 }
 
 enum Role {
@@ -41,261 +263,9 @@ enum StatusIzinCuti {
   REJECTED
 }
 
-model User {
-  id                   BigInt    @id @default(autoincrement())
-  name                 String    @db.VarChar(255)
-  email                String?   @db.VarChar(255)
-  password             String    @db.VarChar(255)
-  role                 Role      @default(USER)
-  need_password_reset  Boolean   @default(false)
-  reset_requested_at   DateTime?
-  created_at           DateTime  @default(now())
-  updated_at           DateTime  @updatedAt
-  
-  karyawan             Karyawan?
-
-  @@map("users")
-}
-
-model JenisKaryawan {
-  id                    BigInt     @id @default(autoincrement())
-  nama_jenis            String     @db.VarChar(255)
-  jam_masuk             DateTime   @db.Time
-  jam_pulang            DateTime   @db.Time
-  toleransi_terlambat   Int        @default(15) // dalam menit
-  created_at            DateTime   @default(now())
-  updated_at            DateTime   @updatedAt
-  
-  karyawan              Karyawan[]
-
-  @@map("jenis_karyawan")
-}
-
-model Karyawan {
-  id                 BigInt          @id @default(autoincrement())
-  user_id            BigInt          @unique
-  nip                String          @unique @db.VarChar(50)
-  nama               String          @db.VarChar(255)
-  jenis_karyawan_id  BigInt
-  no_hp              String          @db.VarChar(20)
-  alamat             String          @db.Text
-  status             StatusKaryawan  @default(AKTIF)
-  created_at         DateTime        @default(now())
-  updated_at         DateTime        @updatedAt
-  
-  user               User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  jenis_karyawan     JenisKaryawan   @relation(fields: [jenis_karyawan_id], references: [id])
-  absensi            Absensi[]
-  izin_cuti          IzinCuti[]
-  lembur             Lembur[]
-
-  @@index([user_id])
-  @@index([jenis_karyawan_id])
-  @@map("karyawan")
-}
-
-model Absensi {
-  id           BigInt         @id @default(autoincrement())
-  karyawan_id  BigInt
-  tanggal      DateTime       @db.Date
-  jam_masuk    DateTime?      @db.Time
-  jam_pulang   DateTime?      @db.Time
-  status       StatusAbsensi
-  latitude     Decimal?       @db.Decimal(10, 8)
-  longitude    Decimal?       @db.Decimal(11, 8)
-  foto_masuk   String?        @db.VarChar(500)
-  foto_pulang  String?        @db.VarChar(500)
-  created_at   DateTime       @default(now())
-  updated_at   DateTime       @updatedAt
-  
-  karyawan     Karyawan       @relation(fields: [karyawan_id], references: [id], onDelete: Cascade)
-
-  @@index([karyawan_id])
-  @@index([tanggal])
-  @@map("absensi")
-}
-
-model IzinCuti {
-  id               BigInt          @id @default(autoincrement())
-  karyawan_id      BigInt
-  jenis            JenisIzinCuti
-  tanggal_mulai    DateTime        @db.Date
-  tanggal_selesai  DateTime        @db.Date
-  alasan           String          @db.Text
-  status           StatusIzinCuti  @default(PENDING)
-  created_at       DateTime        @default(now())
-  updated_at       DateTime        @updatedAt
-  
-  karyawan         Karyawan        @relation(fields: [karyawan_id], references: [id], onDelete: Cascade)
-
-  @@index([karyawan_id])
-  @@map("izin_cuti")
-}
-
-model Lembur {
-  id          BigInt    @id @default(autoincrement())
-  karyawan_id BigInt
-  tanggal     DateTime  @db.Date
-  jam_mulai   DateTime  @db.Time
-  jam_selesai DateTime  @db.Time
-  total_jam   Decimal   @db.Decimal(4, 2)
-  keterangan  String    @db.Text
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
-  
-  karyawan    Karyawan  @relation(fields: [karyawan_id], references: [id], onDelete: Cascade)
-
-  @@index([karyawan_id])
-  @@map("lembur")
-}
-
-// ============================================
-// INVENTORY SYSTEM - USAHA PEMOTONGAN AYAM
-// ============================================
-
 enum StatusClaim {
   BISA_CLAIM
   TIDAK_BISA
-}
 
-// Master Data Perusahaan (Supplier Ayam)
-model Perusahaan {
-  id               BigInt        @id @default(autoincrement())
-  nama_perusahaan  String        @db.VarChar(255)
-  alamat           String?       @db.Text
-  kontak           String?       @db.VarChar(100)
-  created_at       DateTime      @default(now())
-  updated_at       DateTime      @updatedAt
-
-  barang_masuk              BarangMasuk[]
-  ayam_mati                 AyamMati[]
-  barang_keluar_ayam_hidup  BarangKeluarAyamHidup[]
-  barang_keluar_daging      BarangKeluarDaging[]
-
-  @@map("perusahaan")
-}
-
-// Barang Masuk (Ayam Hidup dari Perusahaan)
-model BarangMasuk {
-  id                  BigInt      @id @default(autoincrement())
-  perusahaan_id       BigInt
-  tanggal_masuk       DateTime    @db.Date
-  jumlah_ekor         Int
-  total_kg            Decimal     @db.Decimal(10, 2)
-  bw                  Decimal     @db.Decimal(6, 3)  // Berat rata-rata (auto-calculated)
-  harga_per_kg        Decimal     @db.Decimal(12, 2)
-  total_harga         Decimal     @db.Decimal(15, 2) // Auto-calculated
-  tanggal_pembayaran  DateTime?   @db.Date
-  jumlah_transfer     Decimal     @default(0) @db.Decimal(15, 2)
-  saldo_kita          Decimal     @db.Decimal(15, 2) // Auto-calculated
-  nama_kandang        String      @db.VarChar(255)
-  alamat_kandang      String?     @db.Text
-  no_mobil            String?     @db.VarChar(50)
-  nama_supir          String?     @db.VarChar(255)
-  created_at          DateTime    @default(now())
-  updated_at          DateTime    @updatedAt
-
-  perusahaan          Perusahaan  @relation(fields: [perusahaan_id], references: [id], onDelete: Cascade)
-
-  @@index([perusahaan_id])
-  @@index([tanggal_masuk])
-  @@map("barang_masuk")
-}
-
-// Ayam Mati (Dalam Perjalanan)
-model AyamMati {
-  id              BigInt       @id @default(autoincrement())
-  perusahaan_id   BigInt
-  tanggal         DateTime     @db.Date
-  jumlah_ekor     Int
-  keterangan      String?      @db.Text
-  status_claim    StatusClaim  // Auto-set based on jumlah_ekor
-  created_at      DateTime     @default(now())
-  updated_at      DateTime     @updatedAt
-
-  perusahaan      Perusahaan   @relation(fields: [perusahaan_id], references: [id], onDelete: Cascade)
-
-  @@index([perusahaan_id])
-  @@index([tanggal])
-  @@map("ayam_mati")
-}
-
-// Barang Keluar - Ayam Hidup (Penjualan/Pemotongan)
-// MENGURANGI stok ayam hidup berdasarkan jumlah_ekor
-model BarangKeluarAyamHidup {
-  id               BigInt       @id @default(autoincrement())
-  perusahaan_id    BigInt
-  tanggal          DateTime     @db.Date
-  nama_customer    String       @db.VarChar(255)
-  jumlah_ekor      Int
-  total_kg         Decimal      @db.Decimal(10, 2)
-  jenis_daging     String       @default("BESAR") @db.VarChar(10)     // BESAR / KECIL
-  harga_per_kg     Decimal      @db.Decimal(12, 2)
-  total_penjualan  Decimal      @db.Decimal(15, 2)  // Auto: harga_per_kg * total_kg
-  pengeluaran      Decimal      @default(0) @db.Decimal(15, 2)  // Catatan biaya
-  total_bersih     Decimal      @default(0) @db.Decimal(15, 2)  // Auto: total_penjualan - pengeluaran
-  created_at       DateTime     @default(now())
-  updated_at       DateTime     @updatedAt
-
-  perusahaan       Perusahaan   @relation(fields: [perusahaan_id], references: [id], onDelete: Cascade)
-
-  @@index([perusahaan_id])
-  @@index([tanggal])
-  @@map("barang_keluar_ayam_hidup")
-}
-
-// =============================================
-// MASTER JENIS DAGING (untuk Barang Keluar Daging)
-// =============================================
-model JenisDaging {
-  id          BigInt    @id @default(autoincrement())
-  nama_jenis  String    @db.VarChar(100)
-  aktif       Boolean   @default(true)
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
-
-  detail_daging  BarangKeluarDagingDetail[]
-
-  @@map("jenis_daging")
-}
-
-// Barang Keluar - Daging Ayam (HEADER)
-// Pencatatan penjualan daging - TIDAK mempengaruhi stok ayam hidup
-model BarangKeluarDaging {
-  id               BigInt       @id @default(autoincrement())
-  perusahaan_id    BigInt?
-  tanggal          DateTime     @db.Date
-  nama_customer    String       @db.VarChar(255)
-  total_penjualan  Decimal      @default(0) @db.Decimal(15, 2)  // Auto: SUM(subtotal detail)
-  pengeluaran      Decimal      @default(0) @db.Decimal(15, 2)  // Input admin
-  saldo            Decimal      @default(0) @db.Decimal(15, 2)  // Auto: total_penjualan - pengeluaran
-  keterangan       String?      @db.Text
-  created_at       DateTime     @default(now())
-  updated_at       DateTime     @updatedAt
-
-  perusahaan  Perusahaan?                  @relation(fields: [perusahaan_id], references: [id], onDelete: SetNull)
-  details     BarangKeluarDagingDetail[]
-
-  @@index([perusahaan_id])
-  @@index([tanggal])
-  @@map("barang_keluar_daging")
-}
-
-// Barang Keluar - Daging Ayam (DETAIL)
-// Setiap baris = 1 jenis daging dengan berat & harga
-model BarangKeluarDagingDetail {
-  id                       BigInt    @id @default(autoincrement())
-  barang_keluar_daging_id  BigInt
-  jenis_daging_id          BigInt
-  berat_kg                 Decimal   @db.Decimal(10, 2)
-  harga_per_kg             Decimal   @db.Decimal(15, 2)
-  subtotal                 Decimal   @db.Decimal(15, 2)   // Auto: berat_kg * harga_per_kg
-  created_at               DateTime  @default(now())
-
-  header       BarangKeluarDaging  @relation(fields: [barang_keluar_daging_id], references: [id], onDelete: Cascade)
-  jenis_daging JenisDaging         @relation(fields: [jenis_daging_id], references: [id], onDelete: Restrict)
-
-  @@index([barang_keluar_daging_id])
-  @@index([jenis_daging_id])
-  @@map("barang_keluar_daging_detail")
+  @@map("ayam_mati_status_claim")
 }
