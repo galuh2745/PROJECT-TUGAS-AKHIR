@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import {
   LogIn, LogOut, CheckCircle2, Clock, CalendarCheck, AlertTriangle,
-  Loader2, RefreshCw, X
+  Loader2, RefreshCw, X, MapPin
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 
 const Camera = dynamic(() => import('@/components/Camera'), { ssr: false });
+const AbsensiMap = dynamic(() => import('@/components/AbsensiMap'), { ssr: false });
 
 interface Karyawan {
   id: string;
@@ -100,6 +101,8 @@ export default function UserDashboard() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
 
   const handleAbsenMasuk = () => setShowCamera(true);
 
@@ -140,7 +143,8 @@ export default function UserDashboard() {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000,
+          maximumAge: 0,
         });
       });
 
@@ -285,6 +289,27 @@ export default function UserDashboard() {
                 <span>Memproses...</span>
               </div>
             )}
+          </CardContent>
+        </Card>
+      </FadeIn>
+
+      {/* Lokasi Saat Ini (Map) */}
+      <FadeIn>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-blue-500" />
+              Lokasi Anda Saat Ini
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AbsensiMap
+              height="250px"
+              onLocationChange={(loc) => {
+                setUserLocation({ lat: loc.latitude, lng: loc.longitude });
+                setUserAddress(loc.address);
+              }}
+            />
           </CardContent>
         </Card>
       </FadeIn>

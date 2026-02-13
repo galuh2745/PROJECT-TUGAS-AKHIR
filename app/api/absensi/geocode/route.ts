@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
   // Coba HERE Maps dulu
   if (HERE_API_KEY) {
     try {
+      console.log('[Geocode API] Menggunakan HERE Maps API...');
       const hRes = await fetch(
         `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${latitude},${longitude}&lang=id&apiKey=${HERE_API_KEY}`,
         { signal: AbortSignal.timeout(5000) }
@@ -30,13 +31,20 @@ export async function GET(req: NextRequest) {
             .replace(/,\s*Indonesia$/i, '')
             .trim();
           if (label) {
+            console.log('[Geocode API] HERE Maps berhasil:', label);
             return NextResponse.json({ success: true, address: label });
           }
         }
+        console.warn('[Geocode API] HERE Maps response OK tapi tidak ada hasil');
+      } else {
+        const errBody = await hRes.text();
+        console.error(`[Geocode API] HERE Maps gagal (${hRes.status}):`, errBody);
       }
     } catch (err) {
-      console.error('HERE geocoding error:', err);
+      console.error('[Geocode API] HERE Maps error:', err);
     }
+  } else {
+    console.log('[Geocode API] HERE_API_KEY tidak diset, langsung pakai Nominatim');
   }
 
   // Fallback: Nominatim

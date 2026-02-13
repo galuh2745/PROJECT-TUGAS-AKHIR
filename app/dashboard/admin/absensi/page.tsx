@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import dynamic from 'next/dynamic';
 import {
   Download, Calendar, AlertCircle, ChevronRight, Camera, RotateCcw, Loader2, ClipboardList, Users, CheckCircle2, Clock, FileWarning, XCircle, X
 } from 'lucide-react';
@@ -12,9 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
+import { MapPin } from 'lucide-react';
 
 interface JenisKaryawan { id: string; nama: string; }
-interface DetailAbsensi { id: string; tanggal: string; jam_masuk: string; jam_pulang: string; status: string; foto_masuk: string | null; foto_pulang: string | null; }
+interface DetailAbsensi { id: string; tanggal: string; jam_masuk: string; jam_pulang: string; status: string; foto_masuk: string | null; foto_pulang: string | null; latitude: number | null; longitude: number | null; }
 interface RekapKaryawan { karyawan_id: string; nip: string; nama: string; jenis_karyawan: JenisKaryawan; rekap: { hadir: number; terlambat: number; izin: number; cuti: number; alpha: number; total_masuk: number; }; detail: DetailAbsensi[]; }
 interface Summary { total_karyawan: number; total_hadir: number; total_terlambat: number; total_izin: number; total_cuti: number; total_alpha: number; }
 interface Periode { bulan: number; tahun: number; tanggal_awal: string; tanggal_akhir: string; }
@@ -55,6 +57,7 @@ export default function RiwayatAbsensiPage() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number; tanggal: string } | null>(null);
 
   const fetchOptions = async () => {
     try {
@@ -267,6 +270,7 @@ export default function RiwayatAbsensiPage() {
                                       <th className="px-4 py-2 text-center text-xs font-medium text-muted-foreground uppercase hidden sm:table-cell">Pulang</th>
                                       <th className="px-4 py-2 text-center text-xs font-medium text-muted-foreground uppercase">Status</th>
                                       <th className="px-4 py-2 text-center text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Foto</th>
+                                      <th className="px-4 py-2 text-center text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Lokasi</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-border bg-background">
@@ -283,6 +287,19 @@ export default function RiwayatAbsensiPage() {
                                             {d.foto_masuk ? <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-700" onClick={(e) => { e.stopPropagation(); setSelectedPhoto(d.foto_masuk); }}><Camera className="w-3 h-3 mr-1" />Masuk</Button> : <span className="text-xs text-muted-foreground">-</span>}
                                             {d.foto_pulang && <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-700" onClick={(e) => { e.stopPropagation(); setSelectedPhoto(d.foto_pulang); }}><Camera className="w-3 h-3 mr-1" />Pulang</Button>}
                                           </div>
+                                        </td>
+                                        <td className="px-4 py-2 text-center hidden md:table-cell">
+                                          {d.latitude != null && d.longitude != null ? (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setSelectedLocation({ lat: d.latitude!, lng: d.longitude!, tanggal: d.tanggal }); }}
+                                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full hover:bg-blue-100 transition"
+                                            >
+                                              <MapPin className="w-3 h-3" />
+                                              Lihat Peta
+                                            </button>
+                                          ) : (
+                                            <span className="text-xs text-muted-foreground">-</span>
+                                          )}
                                         </td>
                                       </tr>
                                     ))}
@@ -316,6 +333,138 @@ export default function RiwayatAbsensiPage() {
           </div>
         </div>
       )}
+
+      {/* Map Modal */}
+      {selectedLocation && (
+        <LocationMapModal
+          lat={selectedLocation.lat}
+          lng={selectedLocation.lng}
+          tanggal={selectedLocation.tanggal}
+          onClose={() => setSelectedLocation(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Komponen modal peta lokasi absensi
+function LocationMapModal({ lat, lng, tanggal, onClose }: { lat: number; lng: number; tanggal: string; onClose: () => void }) {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const [address, setAddress] = useState<string>('');
+  const [mapReady, setMapReady] = useState(false);
+
+  // Reverse geocode
+  useEffect(() => {
+    fetch(`/api/absensi/geocode?lat=${lat}&lon=${lng}`)
+      .then(r => r.json())
+      .then(d => { if (d.success && d.address) setAddress(d.address); })
+      .catch(() => {});
+  }, [lat, lng]);
+
+  // Init MapLibre
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    let cancelled = false;
+
+    import('maplibre-gl').then((maplibregl) => {
+      if (cancelled || !mapContainerRef.current) return;
+
+      const map = new maplibregl.default.Map({
+        container: mapContainerRef.current,
+        style: {
+          version: 8,
+          sources: {
+            osm: {
+              type: 'raster',
+              tiles: [
+                'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              ],
+              tileSize: 256,
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            },
+          },
+          layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+        },
+        center: [lng, lat],
+        zoom: 17,
+      });
+
+      map.addControl(new maplibregl.default.NavigationControl(), 'top-right');
+
+      // Marker element
+      const markerEl = document.createElement('div');
+      markerEl.innerHTML = `
+        <div style="position:relative;width:40px;height:52px;">
+          <svg width="40" height="52" viewBox="0 0 40 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#ef4444"/>
+            <circle cx="20" cy="18" r="8" fill="white"/>
+            <circle cx="20" cy="18" r="4" fill="#ef4444"/>
+          </svg>
+          <div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:14px;height:5px;background:rgba(0,0,0,0.2);border-radius:50%;"></div>
+        </div>
+      `;
+
+      new maplibregl.default.Marker({ element: markerEl, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .addTo(map);
+
+      mapRef.current = map;
+      setMapReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [lat, lng]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <div className="relative w-full max-w-2xl bg-background rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-red-500" />
+            <div>
+              <h3 className="text-sm font-semibold">Lokasi Absensi</h3>
+              <p className="text-xs text-muted-foreground">{new Date(tanggal).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="rounded-full" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Map */}
+        <div ref={mapContainerRef} style={{ height: '400px', width: '100%' }} />
+
+        {/* Address & Coordinates */}
+        <div className="p-4 border-t space-y-2">
+          {address && (
+            <div className="flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-md px-3 py-2.5">
+              <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-600 leading-snug">{address}</p>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Koordinat: {lat.toFixed(6)}, {lng.toFixed(6)}</p>
+            <a
+              href={`https://www.google.com/maps?q=${lat},${lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+            >
+              Buka di Google Maps
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

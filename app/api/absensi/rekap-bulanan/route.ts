@@ -169,6 +169,8 @@ export async function GET(request: NextRequest) {
         status: a.status,
         foto_masuk: a.foto_masuk || null,
         foto_pulang: a.foto_pulang || null,
+        latitude: a.latitude != null ? parseFloat(String(a.latitude)) : null,
+        longitude: a.longitude != null ? parseFloat(String(a.longitude)) : null,
       }));
 
       return {

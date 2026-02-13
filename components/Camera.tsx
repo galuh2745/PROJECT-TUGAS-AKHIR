@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+
+const AbsensiMap = dynamic(() => import('@/components/AbsensiMap'), { ssr: false });
 
 interface CameraProps {
   onCapture: (photo: Blob, latitude: number, longitude: number) => void;
@@ -21,16 +24,18 @@ export const Camera: React.FC<CameraProps> = ({ onCapture, onCancel, isSubmittin
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
-  // Get user location
+  // Get user location with continuous updates for high accuracy
   useEffect(() => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
+      const watchId = navigator.geolocation.watchPosition(
         async (position) => {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+          console.log(`[GPS] Lokasi: ${lat}, ${lon} (akurasi: ${accuracy}m)`);
           setLocation({ latitude: lat, longitude: lon });
 
-          // Reverse geocode via server-side API (supports Google Maps + Nominatim fallback)
+          // Reverse geocode via server-side API (supports HERE Maps + Nominatim fallback)
           try {
             const res = await fetch(`/api/absensi/geocode?lat=${lat}&lon=${lon}`);
             if (res.ok) {
@@ -52,10 +57,12 @@ export const Camera: React.FC<CameraProps> = ({ onCapture, onCancel, isSubmittin
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000,
           maximumAge: 0,
         }
       );
+
+      return () => navigator.geolocation.clearWatch(watchId);
     } else {
       setError('Browser tidak mendukung geolocation');
       setIsLoadingLocation(false);
@@ -242,11 +249,22 @@ export const Camera: React.FC<CameraProps> = ({ onCapture, onCancel, isSubmittin
           </>
         )}
 
-        {/* Location Status */}
-        <div className="absolute bottom-4 left-4 right-4">
+        {/* Location Status + Mini Map */}
+        <div className="absolute bottom-4 left-4 right-4 space-y-2">
+          {/* Mini Map */}
+          {location && !capturedImage && (
+            <div className="rounded-lg overflow-hidden shadow-lg" style={{ height: '120px' }}>
+              <AbsensiMap
+                height="120px"
+                showAddress={false}
+                interactive={false}
+              />
+            </div>
+          )}
+          {/* Location Text */}
           <div className={`p-3 rounded-lg ${location ? 'bg-green-900/70' : 'bg-yellow-900/70'}`}>
             <div className="flex items-center gap-2 text-white text-sm">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
