@@ -26,9 +26,11 @@ export async function GET(request: NextRequest) {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
     
     let role: string;
+    let userName: string = 'Admin';
     try {
       const { payload } = await jwtVerify(token, secret);
-      role = (payload as { role: string }).role;
+      role = (payload as { role: string; name?: string }).role;
+      userName = (payload as { name?: string }).name || 'Admin';
     } catch {
       return new NextResponse('Token tidak valid', { status: 401 });
     }
@@ -57,8 +59,8 @@ export async function GET(request: NextRequest) {
     // =============================================
     // 3. HITUNG RANGE TANGGAL
     // =============================================
-    const tanggalAwal = new Date(tahun, bulan - 1, 1);
-    const tanggalAkhir = new Date(tahun, bulan, 0, 23, 59, 59, 999);
+    const tanggalAwal = new Date(Date.UTC(tahun, bulan - 1, 1));
+    const tanggalAkhir = new Date(Date.UTC(tahun, bulan, 0, 23, 59, 59, 999));
 
     const namaBulan = [
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -117,21 +119,76 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      // Hitung rekap per karyawan
+      // Query izin/cuti approved
+      const izinCutiData = await prisma.izinCuti.findMany({
+        where: {
+          karyawan_id: { in: karyawanIds },
+          status: 'APPROVED',
+          OR: [
+            { tanggal_mulai: { gte: tanggalAwal, lte: tanggalAkhir } },
+            { tanggal_selesai: { gte: tanggalAwal, lte: tanggalAkhir } },
+            { tanggal_mulai: { lte: tanggalAwal }, tanggal_selesai: { gte: tanggalAkhir } },
+          ],
+        },
+      });
+
+      // Hitung hari kerja (Senin-Sabtu) dalam bulan
+      const hariKerja: Date[] = [];
+      const nowLocal = new Date();
+      const todayUTC = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate(), 23, 59, 59, 999));
+      const batasAkhir = tanggalAkhir < todayUTC ? tanggalAkhir : todayUTC;
+      for (let d = new Date(tanggalAwal); d <= batasAkhir; d.setUTCDate(d.getUTCDate() + 1)) {
+        if (d.getUTCDay() !== 0) hariKerja.push(new Date(d));
+      }
+
+      const isDateCoveredByIzinCuti = (karyawanId: bigint, date: Date): string | null => {
+        const dateStr = date.toISOString().split('T')[0];
+        for (const ic of izinCutiData) {
+          if (ic.karyawan_id !== karyawanId) continue;
+          const mulai = new Date(ic.tanggal_mulai).toISOString().split('T')[0];
+          const selesai = new Date(ic.tanggal_selesai).toISOString().split('T')[0];
+          if (dateStr >= mulai && dateStr <= selesai) return ic.jenis;
+        }
+        return null;
+      };
+
+      // Hitung rekap per karyawan with auto-ALPA
       rekapData = karyawanList.map((karyawan) => {
         const absensiKaryawan = absensiData.filter(
           (a) => a.karyawan_id === karyawan.id
         );
+        const absensiDateSet = new Set(
+          absensiKaryawan.map((a) => a.tanggal.toISOString().split('T')[0])
+        );
+
+        const hadir = absensiKaryawan.filter((a) => a.status === 'HADIR').length;
+        const terlambat = absensiKaryawan.filter((a) => a.status === 'TERLAMBAT').length;
+        let izin = absensiKaryawan.filter((a) => a.status === 'IZIN').length;
+        let cuti = absensiKaryawan.filter((a) => a.status === 'CUTI').length;
+        let alpha = 0;
+
+        // Alpa hanya dihitung dari HARI SETELAH karyawan dibuat (created_at)
+        const karyawanCreatedDate = new Date(karyawan.created_at);
+        karyawanCreatedDate.setUTCHours(0, 0, 0, 0);
+        karyawanCreatedDate.setUTCDate(karyawanCreatedDate.getUTCDate() + 1); // mulai dari hari setelah akun dibuat
+
+        for (const hk of hariKerja) {
+          // Skip hari kerja sebelum karyawan membuat akun
+          if (hk < karyawanCreatedDate) continue;
+
+          const hkStr = hk.toISOString().split('T')[0];
+          if (absensiDateSet.has(hkStr)) continue;
+          const jenis = isDateCoveredByIzinCuti(karyawan.id, hk);
+          if (jenis === 'IZIN' || jenis === 'SAKIT') izin++;
+          else if (jenis === 'CUTI') cuti++;
+          else alpha++;
+        }
 
         return {
           nip: karyawan.nip,
           nama: karyawan.nama,
           jenis: karyawan.jenis_karyawan.nama_jenis,
-          hadir: absensiKaryawan.filter((a) => a.status === 'HADIR').length,
-          terlambat: absensiKaryawan.filter((a) => a.status === 'TERLAMBAT').length,
-          izin: absensiKaryawan.filter((a) => a.status === 'IZIN').length,
-          cuti: absensiKaryawan.filter((a) => a.status === 'CUTI').length,
-          alpha: absensiKaryawan.filter((a) => a.status === 'ALPHA').length,
+          hadir, terlambat, izin, cuti, alpha,
         };
       });
     }
@@ -145,24 +202,46 @@ export async function GET(request: NextRequest) {
       format: 'a4',
     });
 
-    // Header
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // === WATERMARK ===
+    doc.setFontSize(50);
+    doc.setTextColor(200, 200, 200);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CV ASWI SENTOSA LAMPUNG', pageWidth / 2, pageHeight / 2, {
+      align: 'center',
+      angle: 45,
+    });
+    doc.setTextColor(0, 0, 0);
+
+    // === HEADER ===
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('CV ASWI SENTOSA', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text('REKAP ABSENSI BULANAN', doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+    doc.text('CV ASWI SENTOSA LAMPUNG', pageWidth / 2, 15, { align: 'center' });
     
     doc.setFontSize(10);
-    doc.text(`Periode: ${namaBulan[bulan - 1]} ${tahun}`, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text('Jl mufakat wawai, Yukum Jaya, lingkungan VB, Kabupaten Lampung Tengah, Lampung', pageWidth / 2, 21, { align: 'center' });
+
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.line(14, 24, pageWidth - 14, 24);
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('REKAP ABSENSI BULANAN', pageWidth / 2, 31, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Periode: ${namaBulan[bulan - 1]} ${tahun}`, pageWidth / 2, 37, { align: 'center' });
 
     // Jika tidak ada data
     if (rekapData.length === 0) {
       doc.setFontSize(12);
-      doc.text('Tidak ada data absensi untuk periode ini.', doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
+      doc.text('Tidak ada data absensi untuk periode ini.', pageWidth / 2, 55, { align: 'center' });
       doc.setFontSize(10);
-      doc.text('Silakan pilih periode lain atau periksa data karyawan.', doc.internal.pageSize.getWidth() / 2, 58, { align: 'center' });
+      doc.text('Silakan pilih periode lain atau periksa data karyawan.', pageWidth / 2, 63, { align: 'center' });
     } else {
       // Siapkan data tabel
       const tableHeaders = ['No', 'NIP', 'Nama Karyawan', 'Jenis', 'Hadir', 'Terlambat', 'Izin', 'Cuti', 'Alpha'];
@@ -203,7 +282,7 @@ export async function GET(request: NextRequest) {
       autoTable(doc, {
         head: [tableHeaders],
         body: tableData,
-        startY: 35,
+        startY: 43,
         theme: 'grid',
         styles: {
           fontSize: 8,
@@ -237,15 +316,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Footer
-    const pageHeight = doc.internal.pageSize.getHeight();
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.text(
       `Dicetak pada: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
       14,
-      pageHeight - 15
+      pageHeight - 25
     );
-    doc.text('Sistem Absensi Karyawan - CV Aswi Sentosa', 14, pageHeight - 10);
+    doc.text('Mengetahui: Agus Tri Widodo', 14, pageHeight - 20);
+    doc.text(`Dicetak oleh: ${userName}`, 14, pageHeight - 15);
+    doc.text('Sistem Absensi Karyawan - CV Aswi Sentosa Lampung', 14, pageHeight - 10);
+
+    // Metadata
+    doc.setProperties({
+      title: `Rekap Absensi - ${namaBulan[bulan - 1]} ${tahun}`,
+      subject: 'Rekap Absensi Bulanan',
+      author: 'CV Aswi Sentosa Lampung',
+      creator: 'Sistem Absensi CV Aswi Sentosa',
+    });
 
     // =============================================
     // 7. RETURN PDF RESPONSE

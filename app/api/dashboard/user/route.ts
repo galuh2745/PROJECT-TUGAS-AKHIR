@@ -30,6 +30,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: false, error: 'Data karyawan tidak ditemukan' }, { status: 404 });
     }
 
+    // Query parameters untuk filter bulan/tahun
+    const { searchParams } = new URL(req.url);
+    const bulanParam = searchParams.get('bulan');
+    const tahunParam = searchParams.get('tahun');
+    const tanggalParam = searchParams.get('tanggal');
+
     // Gunakan tanggal lokal (konsisten dengan absensi)
     const now = new Date();
     const year = now.getFullYear();
@@ -37,13 +43,30 @@ export async function GET(req: Request) {
     const day = String(now.getDate()).padStart(2, '0');
     const todayStr = `${year}-${month}-${day}`;
     const today = new Date(todayStr + 'T00:00:00.000Z');
-    
-    // Debug log
-    console.log('Dashboard user - todayStr:', todayStr, ', today UTC:', today.toISOString());
 
-    // Get first and last day of current month
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    // Validasi parameter tanggal jika ada
+    if (tanggalParam && !/^\d{4}-\d{2}-\d{2}$/.test(tanggalParam)) {
+      return NextResponse.json({ success: false, error: 'Parameter tanggal tidak valid (YYYY-MM-DD)' }, { status: 400 });
+    }
+
+    // Tentukan bulan dan tahun untuk filter (dari parameter atau bulan berjalan)
+    const parsedBulan = bulanParam ? parseInt(bulanParam, 10) : undefined;
+    const parsedTahun = tahunParam ? parseInt(tahunParam, 10) : undefined;
+
+    if (parsedBulan !== undefined && (isNaN(parsedBulan) || parsedBulan < 1 || parsedBulan > 12)) {
+      return NextResponse.json({ success: false, error: 'Parameter bulan tidak valid (1-12)' }, { status: 400 });
+    }
+
+    if (parsedTahun !== undefined && (isNaN(parsedTahun) || parsedTahun < 2000 || parsedTahun > 2100)) {
+      return NextResponse.json({ success: false, error: 'Parameter tahun tidak valid' }, { status: 400 });
+    }
+
+    const filterBulan = parsedBulan ?? now.getMonth() + 1;
+    const filterTahun = parsedTahun ?? now.getFullYear();
+
+    // Get first and last day of month (UTC agar konsisten)
+    const firstDayOfMonth = new Date(Date.UTC(filterTahun, filterBulan - 1, 1));
+    const lastDayOfMonth = new Date(Date.UTC(filterTahun, filterBulan, 0, 23, 59, 59, 999));
 
     // 1. Status absensi hari ini
     const absensiHariIni = await prisma.absensi.findFirst({
@@ -80,51 +103,51 @@ export async function GET(req: Request) {
       return total + Number(item.total_jam);
     }, 0);
 
-    // 4. Riwayat absensi (30 hari terakhir)
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // 4. Riwayat absensi (berdasarkan bulan/tahun atau tanggal spesifik)
+    const whereTanggalAbsensi = tanggalParam
+      ? { gte: new Date(tanggalParam + 'T00:00:00.000Z'), lte: new Date(tanggalParam + 'T23:59:59.999Z') }
+      : { gte: firstDayOfMonth, lte: lastDayOfMonth };
 
     const riwayatAbsensi = await prisma.absensi.findMany({
       where: {
         karyawan_id: karyawan.id,
-        tanggal: {
-          gte: thirtyDaysAgo,
-          lte: today,
-        },
+        tanggal: whereTanggalAbsensi,
       },
       orderBy: {
         tanggal: 'desc',
       },
-      take: 30,
     });
 
-    // 5. Riwayat izin & cuti (30 hari terakhir)
+    // 5. Riwayat izin & cuti (berdasarkan bulan/tahun filter)
     const riwayatIzinCuti = await prisma.izinCuti.findMany({
       where: {
         karyawan_id: karyawan.id,
-        created_at: {
-          gte: thirtyDaysAgo,
-        },
+        OR: [
+          {
+            tanggal_mulai: { gte: firstDayOfMonth, lte: lastDayOfMonth },
+          },
+          {
+            tanggal_selesai: { gte: firstDayOfMonth, lte: lastDayOfMonth },
+          },
+        ],
       },
       orderBy: {
         created_at: 'desc',
       },
-      take: 10,
     });
 
-    // 6. Riwayat lembur (30 hari terakhir)
+    // 6. Riwayat lembur (berdasarkan bulan/tahun filter)
     const riwayatLembur = await prisma.lembur.findMany({
       where: {
         karyawan_id: karyawan.id,
         tanggal: {
-          gte: thirtyDaysAgo,
-          lte: today,
+          gte: firstDayOfMonth,
+          lte: lastDayOfMonth,
         },
       },
       orderBy: {
         tanggal: 'desc',
       },
-      take: 10,
     });
 
     // Format data

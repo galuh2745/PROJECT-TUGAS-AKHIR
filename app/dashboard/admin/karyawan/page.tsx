@@ -319,7 +319,7 @@ export default function ManajemenKaryawanPage() {
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-3">
-        <Button onClick={() => { setFormKaryawan({ nama: '', nip: '', password: '', jenis_karyawan_id: '', no_hp: '', alamat: '', status: 'AKTIF' }); setShowAddModal(true); }}>
+        <Button onClick={() => { setFormKaryawan({ nama: '', nip: '', password: '', jenis_karyawan_id: '', no_hp: '', alamat: '', status: 'AKTIF' }); setShowAddModal(true); }} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md rounded-lg">
           <Plus className="w-4 h-4 mr-2" /> Tambah Karyawan
         </Button>
         <Button variant="secondary" onClick={() => setShowJenisModal(true)}>

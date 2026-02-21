@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { CalendarDays, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -28,30 +30,63 @@ const statusMap: Record<string, { cls: string; label: string }> = {
   ALPHA: { cls: 'bg-red-50 text-red-700 border-red-200', label: 'Alpha' },
 };
 
+const getBulanNama = (b: number) => ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][b - 1] || '';
+
 export default function RiwayatAbsensiPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [riwayat, setRiwayat] = useState<RiwayatAbsensi[]>([]);
-  const [filterBulan, setFilterBulan] = useState('');
+  const [bulan, setBulan] = useState(new Date().getMonth() + 1);
+  const [tahun, setTahun] = useState(new Date().getFullYear());
+  const [filterTanggal, setFilterTanggal] = useState('');
+  const requestIdRef = useRef(0);
+
+  const currentYear = new Date().getFullYear();
+  const tahunOptions = [];
+  for (let y = currentYear; y >= currentYear - 5; y--) tahunOptions.push(y);
+
+  const fetchData = useCallback(async (b: number, t: number, tanggal: string) => {
+    const requestId = ++requestIdRef.current;
+    try {
+      setLoading(true);
+      setRiwayat([]);
+      const params = new URLSearchParams({ bulan: b.toString(), tahun: t.toString() });
+      if (tanggal) params.set('tanggal', tanggal);
+      params.set('_t', Date.now().toString());
+      const res = await fetch(`/api/dashboard/user?${params.toString()}`, { credentials: 'include', cache: 'no-store' });
+      if (requestId !== requestIdRef.current) return;
+      if (res.status === 401) { router.push('/login'); return; }
+      const data = await res.json();
+      if (requestId !== requestIdRef.current) return;
+      if (data.success) {
+        setRiwayat(data.data.riwayat.absensi || []);
+      } else {
+        toast.error(data.error || 'Gagal memuat data');
+      }
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Gagal memuat data riwayat absensi');
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [router]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/dashboard/user', { credentials: 'include' });
-        if (res.status === 401) { router.push('/login'); return; }
-        const data = await res.json();
-        if (data.success) setRiwayat(data.data.riwayat.absensi || []);
-      } catch (error) { console.error('Fetch error:', error); } finally { setLoading(false); }
-    };
-    fetchData();
-  }, []);
+    fetchData(bulan, tahun, filterTanggal);
+  }, [bulan, tahun, filterTanggal, fetchData]);
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
   const formatTime = (t: string | null) => t ? new Date(t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
 
-  const filteredRiwayat = filterBulan ? riwayat.filter(i => i.tanggal.startsWith(filterBulan)) : riwayat;
-  const uniqueMonths = Array.from(new Set(riwayat.map(i => i.tanggal.substring(0, 7)))).sort().reverse();
+  const filteredRiwayat = riwayat;
+
+  const handleResetFilter = () => {
+    setBulan(new Date().getMonth() + 1);
+    setTahun(new Date().getFullYear());
+    setFilterTanggal('');
+  };
 
   if (loading) return <LoadingSpinner text="Memuat data..." />;
 
@@ -73,18 +108,31 @@ export default function RiwayatAbsensiPage() {
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1 space-y-2">
-              <Label>Filter Bulan</Label>
-              <select value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)} className={selectClass}>
-                <option value="">Semua Bulan</option>
-                {uniqueMonths.map(month => (
-                  <option key={month} value={month}>
-                    {new Date(month + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
-                  </option>
-                ))}
+              <Label>Bulan</Label>
+              <select value={bulan} onChange={(e) => { setBulan(parseInt(e.target.value)); setFilterTanggal(''); }} className={selectClass}>
+                {[...Array(12)].map((_, i) => <option key={i+1} value={i+1}>{getBulanNama(i+1)}</option>)}
               </select>
             </div>
-            {filterBulan && (
-              <Button variant="outline" onClick={() => setFilterBulan('')}>
+            <div className="flex-1 space-y-2">
+              <Label>Tahun</Label>
+              <select value={tahun} onChange={(e) => { setTahun(parseInt(e.target.value)); setFilterTanggal(''); }} className={selectClass}>
+                {tahunOptions.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div className="flex-1 space-y-2">
+              <Label>Filter Tanggal</Label>
+              <Input type="date" value={filterTanggal} onChange={(e) => {
+                const val = e.target.value;
+                setFilterTanggal(val);
+                if (val) {
+                  const [year, month] = val.split('-');
+                  setBulan(parseInt(month, 10));
+                  setTahun(parseInt(year, 10));
+                }
+              }} />
+            </div>
+            {(filterTanggal || bulan !== new Date().getMonth() + 1 || tahun !== new Date().getFullYear()) && (
+              <Button variant="outline" onClick={handleResetFilter}>
                 <RotateCcw className="w-4 h-4 mr-2" /> Reset
               </Button>
             )}

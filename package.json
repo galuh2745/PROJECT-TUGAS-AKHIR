@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:create-users": "tsx scripts/create-test-user.ts",
-    "db:seed": "tsx prisma/seed-raw.ts"
+    "db:seed": "tsx prisma/seed-raw.ts",
+    "db:seed-absensi-filter": "tsx scripts/seed-absensi-filter.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

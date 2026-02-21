@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { jwtVerify } from 'jose';
-import PDFDocument from 'pdfkit';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export async function GET(req: Request) {
   try {
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
 
     const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
     const { payload } = await jwtVerify(token, secret);
-    const { role } = payload as { userId: number; role: string };
+    const { role, name: userName } = payload as { userId: number; role: string; name?: string };
 
     if (role !== 'ADMIN' && role !== 'OWNER') {
       return NextResponse.json({ success: false, error: 'Forbidden - hanya admin yang bisa mengakses' }, { status: 403 });
@@ -65,116 +66,112 @@ export async function GET(req: Request) {
     // Calculate total hours
     const totalJamLembur = dataLembur.reduce((total, item) => total + Number(item.total_jam), 0);
 
-    // Create PDF
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    const chunks: Uint8Array[] = [];
+    // Create PDF with jsPDF
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
-    doc.on('data', (chunk) => chunks.push(chunk));
+    // === WATERMARK ===
+    doc.setFontSize(50);
+    doc.setTextColor(200, 200, 200);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CV ASWI SENTOSA LAMPUNG', pageWidth / 2, pageHeight / 2, {
+      align: 'center',
+      angle: 45,
+    });
+    doc.setTextColor(0, 0, 0);
 
-    // Header
-    doc.fontSize(18).font('Helvetica-Bold').text('LAPORAN LEMBUR KARYAWAN', { align: 'center' });
-    doc.fontSize(14).font('Helvetica').text('CV Aswi Sentosa', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(10).text(`Periode: ${new Date(tanggalMulai).toLocaleDateString('id-ID')} - ${new Date(tanggalSelesai).toLocaleDateString('id-ID')}`, { align: 'center' });
-    doc.moveDown(2);
+    // === HEADER ===
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CV ASWI SENTOSA LAMPUNG', pageWidth / 2, 15, { align: 'center' });
 
-    // Table headers
-    const tableTop = doc.y;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Jl mufakat wawai, Yukum Jaya, lingkungan VB, Kabupaten Lampung Tengah, Lampung', pageWidth / 2, 21, { align: 'center' });
+
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.line(14, 24, pageWidth - 14, 24);
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LAPORAN LEMBUR KARYAWAN', pageWidth / 2, 31, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Periode: ${new Date(tanggalMulai).toLocaleDateString('id-ID')} - ${new Date(tanggalSelesai).toLocaleDateString('id-ID')}`, pageWidth / 2, 37, { align: 'center' });
+
+    // === TABLE ===
     const tableHeaders = ['No', 'Nama Karyawan', 'Tanggal', 'Jam Mulai', 'Jam Selesai', 'Total Jam', 'Keterangan'];
-    const columnWidths = [30, 120, 80, 70, 70, 60, 80];
-    let xPosition = 50;
 
-    doc.fontSize(9).font('Helvetica-Bold');
-    tableHeaders.forEach((header, i) => {
-      doc.text(header, xPosition, tableTop, { width: columnWidths[i], align: 'left' });
-      xPosition += columnWidths[i];
-    });
-
-    // Draw line under header
-    doc.moveTo(50, doc.y + 5).lineTo(545, doc.y + 5).stroke();
-    doc.moveDown(0.5);
-
-    // Table data
-    doc.font('Helvetica').fontSize(8);
-    dataLembur.forEach((item, index) => {
-      if (doc.y > 700) {
-        doc.addPage();
-        doc.fontSize(9).font('Helvetica-Bold');
-        let xPos = 50;
-        tableHeaders.forEach((header, i) => {
-          doc.text(header, xPos, doc.y, { width: columnWidths[i], align: 'left' });
-          xPos += columnWidths[i];
-        });
-        doc.moveTo(50, doc.y + 5).lineTo(545, doc.y + 5).stroke();
-        doc.moveDown(0.5);
-        doc.font('Helvetica').fontSize(8);
-      }
-
-      const rowY = doc.y;
-      xPosition = 50;
-
-      // No
-      doc.text((index + 1).toString(), xPosition, rowY, { width: columnWidths[0], align: 'left' });
-      xPosition += columnWidths[0];
-
-      // Nama Karyawan
-      doc.text(item.karyawan.nama, xPosition, rowY, { width: columnWidths[1], align: 'left' });
-      xPosition += columnWidths[1];
-
-      // Tanggal
-      doc.text(new Date(item.tanggal).toLocaleDateString('id-ID'), xPosition, rowY, { width: columnWidths[2], align: 'left' });
-      xPosition += columnWidths[2];
-
-      // Jam Mulai
+    const tableData = dataLembur.map((item, index) => {
       const jamMulai = new Date(item.jam_mulai).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      doc.text(jamMulai, xPosition, rowY, { width: columnWidths[3], align: 'left' });
-      xPosition += columnWidths[3];
-
-      // Jam Selesai
       const jamSelesai = new Date(item.jam_selesai).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      doc.text(jamSelesai, xPosition, rowY, { width: columnWidths[4], align: 'left' });
-      xPosition += columnWidths[4];
+      const keterangan = item.keterangan.length > 40 ? item.keterangan.substring(0, 40) + '...' : item.keterangan;
 
-      // Total Jam
-      doc.text(Number(item.total_jam).toFixed(2), xPosition, rowY, { width: columnWidths[5], align: 'left' });
-      xPosition += columnWidths[5];
-
-      // Keterangan
-      const keterangan = item.keterangan.length > 30 ? item.keterangan.substring(0, 30) + '...' : item.keterangan;
-      doc.text(keterangan, xPosition, rowY, { width: columnWidths[6], align: 'left' });
-
-      doc.moveDown(0.8);
+      return [
+        (index + 1).toString(),
+        item.karyawan.nama,
+        new Date(item.tanggal).toLocaleDateString('id-ID'),
+        jamMulai,
+        jamSelesai,
+        Number(item.total_jam).toFixed(2),
+        keterangan,
+      ];
     });
 
-    // Summary
-    doc.moveDown(1);
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-    doc.fontSize(9).font('Helvetica-Bold');
-    doc.text(`Total Jam Lembur: ${totalJamLembur.toFixed(2)} jam`, 50, doc.y, { align: 'right' });
-    doc.text(`Total Data: ${dataLembur.length} record`, 50, doc.y + 15, { align: 'right' });
+    // Total row
+    tableData.push(['', '', '', '', 'TOTAL', totalJamLembur.toFixed(2) + ' jam', `${dataLembur.length} record`]);
 
-    // Footer
-    doc.moveDown(2);
-    doc.fontSize(8).font('Helvetica').text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, { align: 'left' });
-    doc.text('Sistem Absensi Karyawan - CV Aswi Sentosa', { align: 'left' });
-
-    // Finalize PDF
-    doc.end();
-
-    // Wait for PDF to be fully generated
-    const pdfBuffer = await new Promise<Buffer>((resolve) => {
-      doc.on('end', () => {
-        resolve(Buffer.concat(chunks));
-      });
+    autoTable(doc, {
+      head: [tableHeaders],
+      body: tableData,
+      startY: 43,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold', halign: 'center' },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 12 },
+        1: { halign: 'left', cellWidth: 50 },
+        2: { halign: 'center', cellWidth: 30 },
+        3: { halign: 'center', cellWidth: 25 },
+        4: { halign: 'center', cellWidth: 25 },
+        5: { halign: 'center', cellWidth: 25 },
+        6: { halign: 'left' },
+      },
+      didParseCell: (data) => {
+        if (data.row.index === tableData.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [240, 240, 240];
+        }
+      },
     });
 
-    // Return PDF - convert Buffer to Uint8Array for NextResponse compatibility
-    return new NextResponse(new Uint8Array(pdfBuffer), {
+    // === FOOTER ===
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Dicetak pada: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 14, pageHeight - 25);
+    doc.text('Mengetahui: Agus Tri Widodo', 14, pageHeight - 20);
+    doc.text(`Dicetak oleh: ${userName || 'Admin'}`, 14, pageHeight - 15);
+    doc.text('Sistem Absensi Karyawan - CV Aswi Sentosa Lampung', 14, pageHeight - 10);
+
+    // === METADATA ===
+    doc.setProperties({
+      title: `Laporan Lembur ${tanggalMulai} - ${tanggalSelesai}`,
+      subject: 'Laporan Lembur Karyawan',
+      author: 'CV Aswi Sentosa Lampung',
+      creator: 'Sistem Absensi CV Aswi Sentosa',
+    });
+
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+
+    return new NextResponse(pdfBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="Laporan_Lembur_${tanggalMulai}_${tanggalSelesai}.pdf"`,
+        'Content-Length': pdfBuffer.length.toString(),
       },
     });
 

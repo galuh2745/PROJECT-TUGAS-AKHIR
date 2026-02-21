@@ -45,16 +45,21 @@ export async function GET(req: Request) {
     const endDate = new Date(year + 1, 0, 1);
 
     // ==================== TOTAL TAHUNAN ====================
+    // Revenue ONLY from Penjualan (linked to BarangKeluar) + PembayaranPiutang
 
-    const [penjualanDaging, penjualanAyamHidup, beliAyam, pengeluaranDaging, pengeluaranAyamHidup] =
+    const [penjualanDagingTahunan, penjualanAyamHidupTahunan, pembayaranPiutangTahunan, beliAyam, pengeluaranDaging, pengeluaranAyamHidup] =
       await Promise.all([
-        prisma.barangKeluarDaging.aggregate({
-          where: { tanggal: { gte: startDate, lt: endDate } },
-          _sum: { saldo: true },
+        prisma.penjualan.aggregate({
+          where: { tanggal: { gte: startDate, lt: endDate }, jenis_transaksi: 'DAGING' },
+          _sum: { jumlah_bayar: true },
         }),
-        prisma.barangKeluarAyamHidup.aggregate({
+        prisma.penjualan.aggregate({
+          where: { tanggal: { gte: startDate, lt: endDate }, jenis_transaksi: 'AYAM_HIDUP' },
+          _sum: { jumlah_bayar: true },
+        }),
+        prisma.pembayaranPiutang.aggregate({
           where: { tanggal: { gte: startDate, lt: endDate } },
-          _sum: { total_penjualan: true },
+          _sum: { jumlah_bayar: true },
         }),
         prisma.barangMasuk.aggregate({
           where: { tanggal_masuk: { gte: startDate, lt: endDate } },
@@ -98,9 +103,10 @@ export async function GET(req: Request) {
       }
     }
 
-    const totalPenjualanDaging = parseFloat(penjualanDaging._sum.saldo?.toString() || '0');
-    const totalPenjualanAyamHidup = parseFloat(penjualanAyamHidup._sum.total_penjualan?.toString() || '0');
-    const totalPemasukan = totalPenjualanDaging + totalPenjualanAyamHidup;
+    const totalPenjualanDaging = parseFloat(penjualanDagingTahunan._sum.jumlah_bayar?.toString() || '0');
+    const totalPenjualanAyamHidup = parseFloat(penjualanAyamHidupTahunan._sum.jumlah_bayar?.toString() || '0');
+    const totalPelunasan = parseFloat(pembayaranPiutangTahunan._sum.jumlah_bayar?.toString() || '0');
+    const totalPemasukan = totalPenjualanDaging + totalPenjualanAyamHidup + totalPelunasan;
 
     const totalBeliAyam = parseFloat(beliAyam._sum.total_harga?.toString() || '0');
     const totalPengeluaranDaging = parseFloat(pengeluaranDaging._sum.pengeluaran?.toString() || '0');
@@ -122,14 +128,14 @@ export async function GET(req: Request) {
       const monthStart = new Date(year, m - 1, 1);
       const monthEnd = new Date(year, m, 1);
 
-      const [dagingMonth, ayamHidupMonth, beliMonth, penDagingMonth, penAyamHidupMonth] = await Promise.all([
-        prisma.barangKeluarDaging.aggregate({
+      const [penjualanMonth, pelunasanMonth, beliMonth, penDagingMonth, penAyamHidupMonth] = await Promise.all([
+        prisma.penjualan.aggregate({
           where: { tanggal: { gte: monthStart, lt: monthEnd } },
-          _sum: { saldo: true },
+          _sum: { jumlah_bayar: true },
         }),
-        prisma.barangKeluarAyamHidup.aggregate({
+        prisma.pembayaranPiutang.aggregate({
           where: { tanggal: { gte: monthStart, lt: monthEnd } },
-          _sum: { total_penjualan: true },
+          _sum: { jumlah_bayar: true },
         }),
         prisma.barangMasuk.aggregate({
           where: { tanggal_masuk: { gte: monthStart, lt: monthEnd } },
@@ -168,8 +174,8 @@ export async function GET(req: Request) {
       }
 
       const pemasukanMonth =
-        parseFloat(dagingMonth._sum.saldo?.toString() || '0') +
-        parseFloat(ayamHidupMonth._sum.total_penjualan?.toString() || '0');
+        parseFloat(penjualanMonth._sum.jumlah_bayar?.toString() || '0') +
+        parseFloat(pelunasanMonth._sum.jumlah_bayar?.toString() || '0');
 
       const pengeluaranMonth =
         parseFloat(beliMonth._sum.total_harga?.toString() || '0') +
@@ -195,6 +201,7 @@ export async function GET(req: Request) {
         pemasukan: {
           penjualan_daging: totalPenjualanDaging,
           penjualan_ayam_hidup: totalPenjualanAyamHidup,
+          kas_masuk_pelunasan: totalPelunasan,
           total: totalPemasukan,
         },
         pengeluaran: {

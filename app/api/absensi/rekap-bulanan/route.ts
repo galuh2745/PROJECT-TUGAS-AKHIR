@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { jwtVerify } from 'jose';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/absensi/rekap-bulanan
  * 
@@ -67,12 +69,38 @@ export async function GET(request: NextRequest) {
     }
 
     // =============================================
-    // 3. HITUNG RANGE TANGGAL
+    // 3. HITUNG RANGE TANGGAL (UTC agar konsisten dengan penyimpanan absensi)
     // =============================================
-    // Tanggal awal bulan (1 bulan, tahun, jam 00:00:00)
-    const tanggalAwal = new Date(tahun, bulan - 1, 1);
-    // Tanggal akhir bulan (tanggal terakhir bulan, jam 23:59:59)
-    const tanggalAkhir = new Date(tahun, bulan, 0, 23, 59, 59, 999);
+    const tanggalAwal = new Date(Date.UTC(tahun, bulan - 1, 1));
+    const tanggalAkhir = new Date(Date.UTC(tahun, bulan, 0, 23, 59, 59, 999));
+    const nowLocal = new Date();
+    const todayUTC = new Date(Date.UTC(nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate(), 23, 59, 59, 999));
+
+    if (tanggalAwal > todayUTC) {
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            periode: {
+              bulan,
+              tahun,
+              tanggal_awal: tanggalAwal.toISOString().split('T')[0],
+              tanggal_akhir: tanggalAkhir.toISOString().split('T')[0],
+            },
+            summary: {
+              total_karyawan: 0,
+              total_hadir: 0,
+              total_terlambat: 0,
+              total_izin: 0,
+              total_cuti: 0,
+              total_alpha: 0,
+            },
+            rekap: [],
+          },
+        },
+        { status: 200 }
+      );
+    }
 
     // =============================================
     // 4. QUERY DATA KARYAWAN DENGAN FILTER
@@ -125,7 +153,57 @@ export async function GET(request: NextRequest) {
     });
 
     // =============================================
-    // 6. HITUNG REKAP PER KARYAWAN
+    // 5b. QUERY DATA IZIN/CUTI YANG APPROVED
+    // =============================================
+    const izinCutiData = await prisma.izinCuti.findMany({
+      where: {
+        karyawan_id: { in: karyawanIds },
+        status: 'APPROVED',
+        OR: [
+          {
+            tanggal_mulai: { gte: tanggalAwal, lte: tanggalAkhir },
+          },
+          {
+            tanggal_selesai: { gte: tanggalAwal, lte: tanggalAkhir },
+          },
+          {
+            tanggal_mulai: { lte: tanggalAwal },
+            tanggal_selesai: { gte: tanggalAkhir },
+          },
+        ],
+      },
+    });
+
+    // =============================================
+    // 5c. HITUNG HARI KERJA (Senin-Sabtu) DALAM BULAN (UTC)
+    // =============================================
+    const hariKerja: Date[] = [];
+    const batasAkhir = tanggalAkhir < todayUTC ? tanggalAkhir : todayUTC;
+    
+    for (let d = new Date(tanggalAwal); d <= batasAkhir; d.setUTCDate(d.getUTCDate() + 1)) {
+      const day = d.getUTCDay(); // 0=Minggu, 6=Sabtu
+      if (day !== 0) { // Senin-Sabtu = hari kerja
+        hariKerja.push(new Date(d));
+      }
+    }
+    const totalHariKerja = hariKerja.length;
+
+    // Helper: check if a date falls within izin/cuti range
+    const isDateCoveredByIzinCuti = (karyawanId: bigint, date: Date): string | null => {
+      const dateStr = date.toISOString().split('T')[0];
+      for (const ic of izinCutiData) {
+        if (ic.karyawan_id !== karyawanId) continue;
+        const mulai = new Date(ic.tanggal_mulai).toISOString().split('T')[0];
+        const selesai = new Date(ic.tanggal_selesai).toISOString().split('T')[0];
+        if (dateStr >= mulai && dateStr <= selesai) {
+          return ic.jenis; // 'IZIN', 'CUTI', or 'SAKIT'
+        }
+      }
+      return null;
+    };
+
+    // =============================================
+    // 6. HITUNG REKAP PER KARYAWAN (DENGAN AUTO-ALPA)
     // =============================================
     const rekapData = karyawanList.map((karyawan) => {
       // Filter absensi untuk karyawan ini
@@ -133,22 +211,60 @@ export async function GET(request: NextRequest) {
         (a) => a.karyawan_id === karyawan.id
       );
 
-      // Hitung jumlah per status
+      // Set tanggal absensi untuk lookup cepat
+      const absensiDateSet = new Set(
+        absensiKaryawan.map((a) => a.tanggal.toISOString().split('T')[0])
+      );
+
+      // Hitung jumlah per status dari record absensi yang ada
       const jumlahHadir = absensiKaryawan.filter(
         (a) => a.status === 'HADIR'
       ).length;
       const jumlahTerlambat = absensiKaryawan.filter(
         (a) => a.status === 'TERLAMBAT'
       ).length;
-      const jumlahIzin = absensiKaryawan.filter(
+      
+      // Hitung IZIN dan CUTI dari record absensi yang sudah ada
+      let jumlahIzinAbsensi = absensiKaryawan.filter(
         (a) => a.status === 'IZIN'
       ).length;
-      const jumlahCuti = absensiKaryawan.filter(
+      let jumlahCutiAbsensi = absensiKaryawan.filter(
         (a) => a.status === 'CUTI'
       ).length;
-      const jumlahAlpha = absensiKaryawan.filter(
-        (a) => a.status === 'ALPHA'
-      ).length;
+
+      // Auto-calculate: hitung hari kerja tanpa absensi
+      // PENTING: Alpa hanya dihitung mulai dari HARI SETELAH karyawan dibuat (created_at)
+      // agar karyawan baru tidak langsung mendapat alpa di hari pembuatan akun
+      let jumlahAlpha = 0;
+      let jumlahIzinExtra = 0;
+      let jumlahCutiExtra = 0;
+
+      const karyawanCreatedDate = new Date(karyawan.created_at);
+      karyawanCreatedDate.setUTCHours(0, 0, 0, 0);
+      karyawanCreatedDate.setUTCDate(karyawanCreatedDate.getUTCDate() + 1); // mulai dari hari setelah akun dibuat
+
+      for (const hk of hariKerja) {
+        // Skip hari kerja sebelum karyawan membuat akun
+        if (hk < karyawanCreatedDate) continue;
+
+        const hkStr = hk.toISOString().split('T')[0];
+        // Sudah ada record absensi untuk hari ini? Skip.
+        if (absensiDateSet.has(hkStr)) continue;
+        
+        // Cek apakah hari ini ter-cover oleh izin/cuti yang approved
+        const jenisIzinCuti = isDateCoveredByIzinCuti(karyawan.id, hk);
+        if (jenisIzinCuti === 'IZIN' || jenisIzinCuti === 'SAKIT') {
+          jumlahIzinExtra++;
+        } else if (jenisIzinCuti === 'CUTI') {
+          jumlahCutiExtra++;
+        } else {
+          // Tidak ada absensi, tidak ada izin/cuti → ALPHA
+          jumlahAlpha++;
+        }
+      }
+
+      const totalIzin = jumlahIzinAbsensi + jumlahIzinExtra;
+      const totalCuti = jumlahCutiAbsensi + jumlahCutiExtra;
 
       // Detail absensi harian (untuk expand view)
       const detailAbsensi = absensiKaryawan.map((a) => ({
@@ -184,8 +300,8 @@ export async function GET(request: NextRequest) {
         rekap: {
           hadir: jumlahHadir,
           terlambat: jumlahTerlambat,
-          izin: jumlahIzin,
-          cuti: jumlahCuti,
+          izin: totalIzin,
+          cuti: totalCuti,
           alpha: jumlahAlpha,
           total_masuk: jumlahHadir + jumlahTerlambat,
         },

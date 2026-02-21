@@ -66,7 +66,7 @@ export default function ChangePasswordPage() {
               {newPassword && newPassword.length < 6 && <p className="text-xs text-red-500">Password minimal 6 karakter</p>}
               <PasswordField label="Konfirmasi Password Baru" id="confirmPassword" value={confirmPassword} onChange={setConfirmPassword} show={showConfirm} toggleShow={() => setShowConfirm(!showConfirm)} />
               {confirmPassword && newPassword !== confirmPassword && <p className="text-xs text-red-500">Password tidak cocok</p>}
-              <Button type="submit" className="w-full bg-[#8B6B1F] hover:bg-[#A67C00]" disabled={loading}>
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md rounded-lg" disabled={loading}>
                 {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</> : 'Ubah Password'}
               </Button>
             </form>

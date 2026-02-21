@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Phone, MapPin, Clock, LogIn, LogOut, Briefcase } from 'lucide-react';
+import Image from 'next/image';
+import { User, Phone, MapPin, Clock, LogIn, LogOut, Briefcase, Camera, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
+import { toast } from 'sonner';
 
 interface UserProfile {
   id: string;
@@ -15,6 +18,7 @@ interface UserProfile {
     nip: string;
     no_hp: string;
     alamat: string;
+    foto_profil: string | null;
     jenis_karyawan: {
       nama_jenis: string;
       jam_masuk: string;
@@ -27,21 +31,62 @@ export default function AkunPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (res.status === 401) { router.push('/login'); return; }
-        const data = await res.json();
-        if (data.success) setProfile(data.user);
-      } catch (error) {
-        console.error('Fetch error:', error);
-      } finally { setLoading(false); }
-    };
-    fetchProfile();
-  }, []);
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.status === 401) { router.push('/login'); return; }
+      const data = await res.json();
+      if (data.success) setProfile(data.user);
+    } catch (error) {
+      console.error('Fetch error:', error);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchProfile(); }, []);
+
+  const handleUploadFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Format file harus JPG, PNG, atau WebP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Ukuran file maksimal 5MB');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('foto', file);
+
+      const res = await fetch('/api/auth/upload-foto', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Foto profil berhasil diupdate');
+        fetchProfile();
+      } else {
+        toast.error(data.message || 'Gagal upload foto');
+      }
+    } catch {
+      toast.error('Terjadi kesalahan saat upload');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const formatTime = (time: string) => time.substring(0, 5);
 
@@ -59,11 +104,44 @@ export default function AkunPage() {
         <FadeIn className="lg:col-span-1">
           <Card>
             <CardContent className="pt-6 text-center">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto ring-4 ring-background shadow-lg">
-                <span className="text-primary font-bold text-2xl">
-                  {profile?.karyawan?.nama?.charAt(0).toUpperCase() || profile?.name?.charAt(0).toUpperCase() || 'U'}
-                </span>
+              {/* Profile Photo */}
+              <div className="relative inline-block">
+                {profile?.karyawan?.foto_profil ? (
+                  <div className="w-24 h-24 rounded-full overflow-hidden mx-auto ring-4 ring-background shadow-lg">
+                    <Image
+                      src={profile.karyawan.foto_profil}
+                      alt="Foto Profil"
+                      width={96}
+                      height={96}
+                      className="w-full h-full object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-linear-to-br from-primary/20 to-primary/5 flex items-center justify-center mx-auto ring-4 ring-background shadow-lg">
+                    <span className="text-primary font-bold text-3xl">
+                      {profile?.karyawan?.nama?.charAt(0).toUpperCase() || profile?.name?.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                )}
+                {/* Upload Button Overlay */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition-colors duration-200 disabled:opacity-50 ring-2 ring-white"
+                  title="Ganti foto profil"
+                >
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleUploadFoto}
+                />
               </div>
+
               <h3 className="mt-4 text-lg font-semibold text-foreground">
                 {profile?.karyawan?.nama || profile?.name}
               </h3>
@@ -72,7 +150,26 @@ export default function AkunPage() {
                 <Briefcase className="w-3 h-3 mr-1" />
                 {profile?.karyawan?.jenis_karyawan?.nama_jenis || 'Karyawan'}
               </span>
-              <div className="mt-6 pt-6 border-t">
+
+              {/* Upload hint */}
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="text-xs"
+                >
+                  {uploading ? (
+                    <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> Mengupload...</>
+                  ) : (
+                    <><Camera className="w-3 h-3 mr-1.5" /> Upload Foto Profil</>
+                  )}
+                </Button>
+                <p className="text-[10px] text-muted-foreground mt-1.5">JPG, PNG, WebP. Maks 5MB</p>
+              </div>
+
+              <div className="mt-4 pt-4 border-t">
                 <p className="text-xs text-muted-foreground">Untuk mengubah password, silakan hubungi Admin.</p>
               </div>
             </CardContent>

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -58,36 +59,60 @@ export default function RiwayatAbsensiPage() {
   const [exporting, setExporting] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number; tanggal: string } | null>(null);
+  const [filterTanggal, setFilterTanggal] = useState('');
 
   const fetchOptions = async () => {
     try {
       const [kRes, jRes] = await Promise.all([
-        fetch('/api/karyawan', { credentials: 'include' }),
-        fetch('/api/jenis-karyawan', { credentials: 'include' }),
+        fetch('/api/karyawan', { credentials: 'include', cache: 'no-store' }),
+        fetch('/api/jenis-karyawan', { credentials: 'include', cache: 'no-store' }),
       ]);
       if (kRes.ok) { const d = await kRes.json(); if (d.success) setKaryawanOptions(d.data.map((k: any) => ({ id: k.id, nip: k.nip, nama: k.nama }))); }
       if (jRes.ok) { const d = await jRes.json(); if (d.success) setJenisKaryawanOptions(d.data); }
     } catch {}
   };
 
-  const fetchRekapAbsensi = async () => {
+  const requestIdRef = useRef(0);
+
+  const fetchRekapAbsensi = async (b: number, t: number, kId: string, jId: string) => {
+    const requestId = ++requestIdRef.current;
+
+    setLoading(true); setError(null); setRekapData([]); setSummary(null); setPeriode(null); setExpandedKaryawan(null);
     try {
-      setLoading(true); setError(null);
-      const params = new URLSearchParams({ bulan: bulan.toString(), tahun: tahun.toString() });
-      if (selectedKaryawan) params.append('karyawan_id', selectedKaryawan);
-      if (selectedJenisKaryawan) params.append('jenis_karyawan_id', selectedJenisKaryawan);
-      const response = await fetch(`/api/absensi/rekap-bulanan?${params.toString()}`, { credentials: 'include' });
+      const params = new URLSearchParams({ bulan: b.toString(), tahun: t.toString(), _t: Date.now().toString() });
+      if (kId) params.append('karyawan_id', kId);
+      if (jId) params.append('jenis_karyawan_id', jId);
+      const response = await fetch(`/api/absensi/rekap-bulanan?${params.toString()}`, { credentials: 'include', cache: 'no-store' });
+
+      // Jika ada request lebih baru, abaikan response ini
+      if (requestId !== requestIdRef.current) return;
+
       if (response.status === 401 || response.status === 403) { router.push('/login'); return; }
       const result: RekapResponse = await response.json();
-      if (result.success && result.data) { setRekapData(result.data.rekap); setSummary(result.data.summary); setPeriode(result.data.periode); }
-      else setError(result.error || 'Gagal memuat data rekap absensi');
-    } catch { setError('Terjadi kesalahan saat memuat data'); } finally { setLoading(false); }
+
+      // Cek lagi setelah parse JSON (parsing bisa memakan waktu)
+      if (requestId !== requestIdRef.current) return;
+
+      if (result.success && result.data) {
+        setRekapData(result.data.rekap); setSummary(result.data.summary); setPeriode(result.data.periode);
+      } else {
+        setError(result.error || 'Gagal memuat data rekap absensi');
+      }
+    } catch (err: any) {
+      if (requestId !== requestIdRef.current) return;
+      setError('Terjadi kesalahan saat memuat data');
+    }
+
+    if (requestId === requestIdRef.current) {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchOptions(); }, []);
-  useEffect(() => { fetchRekapAbsensi(); }, [bulan, tahun, selectedKaryawan, selectedJenisKaryawan]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchRekapAbsensi(bulan, tahun, selectedKaryawan, selectedJenisKaryawan); }, [bulan, tahun, selectedKaryawan, selectedJenisKaryawan]);
 
-  const handleReset = () => { setBulan(new Date().getMonth() + 1); setTahun(new Date().getFullYear()); setSelectedKaryawan(''); setSelectedJenisKaryawan(''); setExpandedKaryawan(null); };
+  const handleReset = () => { setBulan(new Date().getMonth() + 1); setTahun(new Date().getFullYear()); setSelectedKaryawan(''); setSelectedJenisKaryawan(''); setExpandedKaryawan(null); setFilterTanggal(''); };
 
   const handleExportPDF = async () => {
     try {
@@ -115,15 +140,48 @@ export default function RiwayatAbsensiPage() {
 
   const tahunOptions = [];
   const currentYear = new Date().getFullYear();
-  for (let y = currentYear + 1; y >= currentYear - 5; y--) tahunOptions.push(y);
+  for (let y = currentYear; y >= currentYear - 5; y--) tahunOptions.push(y);
 
-  const summaryCards = summary ? [
-    { label: 'Total Karyawan', value: summary.total_karyawan, icon: Users, color: 'text-gray-600', bg: 'bg-gray-100' },
-    { label: 'Total Hadir', value: summary.total_hadir, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { label: 'Total Terlambat', value: summary.total_terlambat, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
-    { label: 'Total Izin', value: summary.total_izin, icon: FileWarning, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { label: 'Total Cuti', value: summary.total_cuti, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-100' },
-    { label: 'Total Alpha', value: summary.total_alpha, icon: XCircle, color: 'text-red-600', bg: 'bg-red-100' },
+  // Filter data berdasarkan tanggal jika dipilih
+  // Mode bulan/tahun: tampilkan semua karyawan dari API (tanpa filter client-side)
+  // Mode tanggal: filter detail per hari, sembunyikan karyawan yang tidak hadir pada tanggal itu
+  const displayData = filterTanggal ? (() => {
+    // Cek apakah tanggal adalah hari kerja (Senin-Sabtu)
+    const dateObj = new Date(filterTanggal + 'T00:00:00');
+    const dayOfWeek = dateObj.getDay(); // 0=Minggu
+    const isWorkday = dayOfWeek !== 0; // Senin-Sabtu = hari kerja
+
+    return rekapData.map(item => {
+      const filteredDetail = item.detail.filter(d => d.tanggal === filterTanggal);
+      const hasRecord = filteredDetail.length > 0;
+      const newRekap = {
+        hadir: filteredDetail.filter(d => d.status === 'HADIR').length,
+        terlambat: filteredDetail.filter(d => d.status === 'TERLAMBAT').length,
+        izin: filteredDetail.filter(d => d.status === 'IZIN').length,
+        cuti: filteredDetail.filter(d => d.status === 'CUTI').length,
+        alpha: hasRecord ? filteredDetail.filter(d => d.status === 'ALPHA').length : (isWorkday ? 1 : 0),
+        total_masuk: filteredDetail.filter(d => d.status === 'HADIR' || d.status === 'TERLAMBAT').length,
+      };
+      return { ...item, detail: filteredDetail, rekap: newRekap };
+    });
+  })() : rekapData;
+
+  const displaySummary = filterTanggal && summary ? {
+    total_karyawan: displayData.length,
+    total_hadir: displayData.reduce((s, r) => s + r.rekap.hadir, 0),
+    total_terlambat: displayData.reduce((s, r) => s + r.rekap.terlambat, 0),
+    total_izin: displayData.reduce((s, r) => s + r.rekap.izin, 0),
+    total_cuti: displayData.reduce((s, r) => s + r.rekap.cuti, 0),
+    total_alpha: displayData.reduce((s, r) => s + r.rekap.alpha, 0),
+  } : summary;
+
+  const summaryCards = displaySummary ? [
+    { label: 'Total Karyawan', value: displaySummary.total_karyawan, icon: Users, color: 'text-gray-600', bg: 'bg-gray-100' },
+    { label: 'Total Hadir', value: displaySummary.total_hadir, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+    { label: 'Total Terlambat', value: displaySummary.total_terlambat, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
+    { label: 'Total Izin', value: displaySummary.total_izin, icon: FileWarning, color: 'text-blue-600', bg: 'bg-blue-100' },
+    { label: 'Total Cuti', value: displaySummary.total_cuti, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-100' },
+    { label: 'Total Alpha', value: displaySummary.total_alpha, icon: XCircle, color: 'text-red-600', bg: 'bg-red-100' },
   ] : [];
 
   return (
@@ -143,18 +201,30 @@ export default function RiwayatAbsensiPage() {
       {/* Filter */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             <div className="space-y-2">
               <Label>Bulan</Label>
-              <select value={bulan} onChange={(e) => setBulan(parseInt(e.target.value))} className={selectClass}>
+              <select value={bulan} onChange={(e) => { setBulan(parseInt(e.target.value)); setFilterTanggal(''); }} className={selectClass}>
                 {[...Array(12)].map((_, i) => <option key={i+1} value={i+1}>{getBulanNama(i+1)}</option>)}
               </select>
             </div>
             <div className="space-y-2">
               <Label>Tahun</Label>
-              <select value={tahun} onChange={(e) => setTahun(parseInt(e.target.value))} className={selectClass}>
+              <select value={tahun} onChange={(e) => { setTahun(parseInt(e.target.value)); setFilterTanggal(''); }} className={selectClass}>
                 {tahunOptions.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Tanggal</Label>
+              <Input type="date" value={filterTanggal} onChange={(e) => {
+                const val = e.target.value;
+                setFilterTanggal(val);
+                if (val) {
+                  const [year, month] = val.split('-');
+                  setBulan(parseInt(month, 10));
+                  setTahun(parseInt(year, 10));
+                }
+              }} />
             </div>
             <div className="space-y-2">
               <Label>Jenis Karyawan</Label>
@@ -178,13 +248,13 @@ export default function RiwayatAbsensiPage() {
       </Card>
 
       {/* Summary Cards */}
-      {summary && (
+      {displaySummary && (
         <StaggerContainer className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {summaryCards.map((item) => (
             <StaggerItem key={item.label}>
-              <Card>
-                <CardContent className="pt-4 pb-4 flex items-center gap-3">
-                  <div className={`w-10 h-10 ${item.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+              <Card className="rounded-xl shadow-sm">
+                <CardContent className="pt-4 pb-4 px-4 flex items-center gap-3 min-h-[80px]">
+                  <div className={`w-10 h-10 ${item.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
                     <item.icon className={`w-5 h-5 ${item.color}`} />
                   </div>
                   <div>
@@ -202,8 +272,17 @@ export default function RiwayatAbsensiPage() {
       {periode && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-2">
           <Calendar className="w-5 h-5 text-blue-600" />
-          <span className="text-blue-800 font-medium">Periode: {getBulanNama(periode.bulan)} {periode.tahun}</span>
-          <span className="text-blue-600 text-sm">({periode.tanggal_awal} s/d {periode.tanggal_akhir})</span>
+          {filterTanggal ? (
+            <>
+              <span className="text-blue-800 font-medium">Filter Tanggal: {new Date(filterTanggal).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              <span className="text-blue-600 text-sm">(dari periode {getBulanNama(periode.bulan)} {periode.tahun})</span>
+            </>
+          ) : (
+            <>
+              <span className="text-blue-800 font-medium">Periode: {getBulanNama(periode.bulan)} {periode.tahun}</span>
+              <span className="text-blue-600 text-sm">({periode.tanggal_awal} s/d {periode.tanggal_akhir})</span>
+            </>
+          )}
         </div>
       )}
 
@@ -231,12 +310,12 @@ export default function RiwayatAbsensiPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {rekapData.length === 0 ? (
+                  {displayData.length === 0 ? (
                     <tr><td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                       <ClipboardList className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                       <p>Tidak ada data absensi untuk periode ini</p>
                     </td></tr>
-                  ) : rekapData.map((item) => (
+                  ) : displayData.map((item) => (
                     <React.Fragment key={item.karyawan_id}>
                       <tr onClick={() => setExpandedKaryawan(expandedKaryawan === item.karyawan_id ? null : item.karyawan_id)} className="hover:bg-muted/50 cursor-pointer transition">
                         <td className="px-3 sm:px-6 py-3">

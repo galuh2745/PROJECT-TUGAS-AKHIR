@@ -70,7 +70,6 @@ export default function AccountsPage() {
   const summaryCards = [
     { label: 'Total Akun', value: accounts.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
     { label: 'Admin', value: adminCount, icon: Shield, color: 'text-red-600', bg: 'bg-red-100', filter: 'ADMIN' },
-    { label: 'Owner', value: ownerCount, icon: UserCheck, color: 'text-purple-600', bg: 'bg-purple-100', filter: 'OWNER' },
     { label: 'User', value: userCount, icon: UserX, color: 'text-emerald-600', bg: 'bg-emerald-100', filter: 'USER' },
   ];
 
@@ -82,7 +81,7 @@ export default function AccountsPage() {
       </div>
 
       {/* Summary Cards */}
-      <StaggerContainer className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <StaggerContainer className="grid grid-cols-3 gap-4">
         {summaryCards.map(item => (
           <StaggerItem key={item.label}>
             <Card className={`cursor-pointer transition hover:shadow-md ${item.filter && filterRole === item.filter ? 'ring-2 ring-primary' : ''}`}

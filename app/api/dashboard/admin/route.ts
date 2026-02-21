@@ -26,6 +26,10 @@ export async function GET(req: Request) {
     const karyawanId = searchParams.get('karyawan_id');
     const status = searchParams.get('status');
 
+    if (tanggal && !/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) {
+      return NextResponse.json({ success: false, error: 'Parameter tanggal tidak valid (YYYY-MM-DD)' }, { status: 400 });
+    }
+
     // Handle tanggal dengan konsisten (gunakan UTC midnight)
     let todayStr: string;
     if (tanggal) {

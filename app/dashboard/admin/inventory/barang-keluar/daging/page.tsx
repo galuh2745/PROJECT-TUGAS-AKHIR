@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Loader2, Eye, PlusCircle, MinusCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Eye, PlusCircle, MinusCircle, CalendarDays, ChevronDown, ChevronRight, FileDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 const selectClass = 'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
 interface JenisDaging { id: string; nama_jenis: string; }
+interface Customer { id: string; nama: string; no_hp?: string; }
 interface DetailItem { jenis_daging_id: string; berat_kg: string; harga_per_kg: string; subtotal: number; }
 interface BarangKeluarDaging {
   id: string; tanggal: string; nama_customer: string;
@@ -27,6 +28,7 @@ interface BarangKeluarDaging {
 export default function BarangKeluarDagingPage() {
   const [data, setData] = useState<BarangKeluarDaging[]>([]);
   const [jenisDagingList, setJenisDagingList] = useState<JenisDaging[]>([]);
+  const [customerList, setCustomerList] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterTanggalDari, setFilterTanggalDari] = useState('');
@@ -37,30 +39,33 @@ export default function BarangKeluarDagingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [viewingData, setViewingData] = useState<BarangKeluarDaging | null>(null);
-  const [formHeader, setFormHeader] = useState({ tanggal: '', nama_customer: '', pengeluaran: '', keterangan: '' });
+  const [formHeader, setFormHeader] = useState({ tanggal: '', customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH' });
   const [formDetails, setFormDetails] = useState<DetailItem[]>([{ jenis_daging_id: '', berat_kg: '', harga_per_kg: '', subtotal: 0 }]);
 
-  useEffect(() => { fetchJenisDaging(); }, []);
+  useEffect(() => { fetchJenisDaging(); fetchCustomers(); }, []);
   useEffect(() => { fetchData(); }, [filterCustomer, filterTanggalDari, filterTanggalSampai]);
 
 
   const fetchJenisDaging = async () => { try { const r = await fetch('/api/inventory/jenis-daging?aktif=true', { credentials: 'include' }); const res = await r.json(); if (res.success) setJenisDagingList(res.data); } catch {} };
+  const fetchCustomers = async () => { try { const r = await fetch('/api/customer', { credentials: 'include' }); const res = await r.json(); if (res.success) setCustomerList(res.data); } catch {} };
   const fetchData = async () => {
-    try { setLoading(true); const p = new URLSearchParams(); if (filterCustomer) p.set('customer', filterCustomer); if (filterTanggalDari) p.set('tanggal_dari', filterTanggalDari); if (filterTanggalSampai) p.set('tanggal_sampai', filterTanggalSampai);
+    try { setLoading(true); const p = new URLSearchParams(); if (filterCustomer) p.set('search', filterCustomer); if (filterTanggalDari) p.set('tanggal_dari', filterTanggalDari); if (filterTanggalSampai) p.set('tanggal_sampai', filterTanggalSampai);
       const r = await fetch(`/api/inventory/barang-keluar/daging?${p}`, { credentials: 'include' }); const res = await r.json(); if (res.success) setData(res.data); else toast.error(res.error);
     } catch { toast.error('Terjadi kesalahan'); } finally { setLoading(false); }
   };
 
   const openAddModal = () => {
     setModalMode('add'); setSelectedData(null);
-    setFormHeader({ tanggal: new Date().toISOString().split('T')[0], nama_customer: '', pengeluaran: '', keterangan: '' });
+    const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    setFormHeader({ tanggal: localDate, customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH' });
     setFormDetails([{ jenis_daging_id: '', berat_kg: '', harga_per_kg: '', subtotal: 0 }]);
     setShowModal(true);
   };
 
   const openEditModal = (item: BarangKeluarDaging) => {
     setModalMode('edit'); setSelectedData(item);
-    setFormHeader({ tanggal: item.tanggal, nama_customer: item.nama_customer, pengeluaran: item.pengeluaran.toString(), keterangan: item.keterangan || '' });
+    const matchedCustomer = customerList.find(c => c.nama === item.nama_customer);
+    setFormHeader({ tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', pengeluaran: item.pengeluaran.toString(), keterangan: item.keterangan || '', jumlah_bayar: item.total_penjualan.toString(), metode_pembayaran: 'CASH' });
     setFormDetails(item.details.map(d => ({ jenis_daging_id: d.jenis_daging_id || d.jenis_daging.id, berat_kg: d.berat_kg.toString(), harga_per_kg: d.harga_per_kg.toString(), subtotal: d.subtotal })));
     setShowModal(true);
   };
@@ -77,6 +82,8 @@ export default function BarangKeluarDagingPage() {
 
   const calculatedTotal = useMemo(() => formDetails.reduce((s, d) => s + d.subtotal, 0), [formDetails]);
   const calculatedSaldo = useMemo(() => calculatedTotal - (parseFloat(formHeader.pengeluaran) || 0), [calculatedTotal, formHeader.pengeluaran]);
+  const calculatedJumlahBayar = useMemo(() => { const val = parseFloat(formHeader.jumlah_bayar); return isNaN(val) ? calculatedTotal : val; }, [formHeader.jumlah_bayar, calculatedTotal]);
+  const calculatedSisaPiutang = useMemo(() => Math.max(0, calculatedTotal - calculatedJumlahBayar), [calculatedTotal, calculatedJumlahBayar]);
 
   const summary = useMemo(() => ({
     totalPenjualan: data.reduce((s, d) => s + d.total_penjualan, 0),
@@ -84,11 +91,61 @@ export default function BarangKeluarDagingPage() {
     totalSaldo: data.reduce((s, d) => s + d.saldo, 0),
   }), [data]);
 
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const toggleDate = (tanggal: string) => setExpandedDates(prev => { const next = new Set(prev); next.has(tanggal) ? next.delete(tanggal) : next.add(tanggal); return next; });
+
+  // Rekap harian: group by tanggal, sum total kg per hari + rincian per jenis
+  const rekapHarian = useMemo(() => {
+    const map = new Map<string, { tanggal: string; totalKg: number; totalPcs: number; totalPenjualan: number; jumlahTransaksi: number; rincian: Map<string, { nama: string; qty: number; isPcs: boolean }> }>();
+    data.forEach(item => {
+      const existing = map.get(item.tanggal) || { tanggal: item.tanggal, totalKg: 0, totalPcs: 0, totalPenjualan: 0, jumlahTransaksi: 0, rincian: new Map() };
+      item.details.forEach(d => {
+        const namaLower = d.jenis_daging.nama_jenis.toLowerCase();
+        const isPcs = namaLower.includes('ati') || namaLower.includes('hati ampela');
+        if (isPcs) {
+          existing.totalPcs += d.berat_kg;
+        } else {
+          existing.totalKg += d.berat_kg;
+        }
+        const key = d.jenis_daging.nama_jenis;
+        const prev = existing.rincian.get(key) || { nama: key, qty: 0, isPcs };
+        prev.qty += d.berat_kg;
+        existing.rincian.set(key, prev);
+      });
+      existing.totalPenjualan += item.total_penjualan;
+      existing.jumlahTransaksi += 1;
+      map.set(item.tanggal, existing);
+    });
+    return Array.from(map.values()).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+  }, [data]);
+
+  // Grand total rincian across all dates
+  const grandRincian = useMemo(() => {
+    const map = new Map<string, { nama: string; qty: number; isPcs: boolean }>();
+    rekapHarian.forEach(r => {
+      r.rincian.forEach((v, k) => {
+        const prev = map.get(k) || { nama: v.nama, qty: 0, isPcs: v.isPcs };
+        prev.qty += v.qty;
+        map.set(k, prev);
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.nama.localeCompare(b.nama));
+  }, [rekapHarian]);
+
+  // Helper: check if a jenis daging is "per piece" type (Ati)
+  const isPerPiece = useCallback((jenisDagingId: string) => {
+    const jenis = jenisDagingList.find(j => j.id === jenisDagingId);
+    if (!jenis) return false;
+    const nama = jenis.nama_jenis.toLowerCase();
+    return nama.includes('ati') || nama.includes('hati ampela');
+  }, [jenisDagingList]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true);
     try {
       const method = modalMode === 'add' ? 'POST' : 'PUT';
-      const body = { ...(modalMode === 'edit' && { id: selectedData?.id }), ...formHeader, pengeluaran: parseFloat(formHeader.pengeluaran) || 0, details: formDetails.map(d => ({ jenis_daging_id: d.jenis_daging_id, berat_kg: parseFloat(d.berat_kg) || 0, harga_per_kg: parseFloat(d.harga_per_kg) || 0 })) };
+      const selectedCustomer = customerList.find(c => c.id === formHeader.customer_id);
+      const body = { ...(modalMode === 'edit' && { id: selectedData?.id }), tanggal: formHeader.tanggal, customer_id: formHeader.customer_id, nama_customer: selectedCustomer?.nama || '', pengeluaran: parseFloat(formHeader.pengeluaran) || 0, keterangan: formHeader.keterangan, jumlah_bayar: calculatedJumlahBayar, metode_pembayaran: formHeader.metode_pembayaran, details: formDetails.map(d => ({ jenis_daging_id: d.jenis_daging_id, berat_kg: parseFloat(d.berat_kg) || 0, harga_per_kg: parseFloat(d.harga_per_kg) || 0 })) };
       const r = await fetch('/api/inventory/barang-keluar/daging', { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
       const res = await r.json(); if (res.success) { toast.success('Data berhasil disimpan'); setShowModal(false); fetchData(); } else toast.error(res.error);
     } catch { toast.error('Terjadi kesalahan'); } finally { setSubmitting(false); }
@@ -113,13 +170,87 @@ export default function BarangKeluarDagingPage() {
       </StaggerContainer>
 
       <Card><CardContent className="pt-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="space-y-2"><Label>Customer</Label><Input placeholder="Cari customer..." value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)} /></div>
-          <div className="space-y-2"><Label>Tanggal Dari</Label><input type="date" value={filterTanggalDari} onChange={(e) => setFilterTanggalDari(e.target.value)} className={selectClass} /></div>
-          <div className="space-y-2"><Label>Tanggal Sampai</Label><input type="date" value={filterTanggalSampai} onChange={(e) => setFilterTanggalSampai(e.target.value)} className={selectClass} /></div>
-          <div className="flex items-end"><Button className="w-full" onClick={openAddModal}><Plus className="w-4 h-4 mr-2" /> Tambah Data</Button></div>
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="w-full md:flex-1 space-y-2"><Label>Customer</Label><Input placeholder="Cari customer..." value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)} /></div>
+          <div className="w-full md:flex-1 space-y-2"><Label>Tanggal Dari</Label><input type="date" value={filterTanggalDari} onChange={(e) => setFilterTanggalDari(e.target.value)} className={selectClass} /></div>
+          <div className="w-full md:flex-1 space-y-2"><Label>Tanggal Sampai</Label><input type="date" value={filterTanggalSampai} onChange={(e) => setFilterTanggalSampai(e.target.value)} className={selectClass} /></div>
+          <div className="flex gap-2 shrink-0">
+            <Button onClick={openAddModal}><Plus className="w-4 h-4 mr-2" /> Tambah Data</Button>
+            <Button variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700" onClick={() => { const p = new URLSearchParams(); if (filterCustomer) p.set('search', filterCustomer); if (filterTanggalDari) p.set('tanggal_dari', filterTanggalDari); if (filterTanggalSampai) p.set('tanggal_sampai', filterTanggalSampai); window.open(`/api/inventory/barang-keluar/daging/pdf?${p}`, '_blank'); }}><FileDown className="w-4 h-4 mr-2" /> PDF</Button>
+          </div>
         </div>
       </CardContent></Card>
+
+      {/* Rekap Harian */}
+      {rekapHarian.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3"><div className="flex items-center gap-2"><CalendarDays className="w-5 h-5 text-indigo-600" /><CardTitle className="text-base">Rekap Harian (Total Keluar per Hari)</CardTitle></div><p className="text-xs text-muted-foreground mt-1">Klik baris tanggal untuk melihat rincian per jenis daging</p></CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead className="w-8"></TableHead><TableHead>Tanggal</TableHead><TableHead className="text-right">Total Kg</TableHead><TableHead className="text-right">Total Pcs (Ati)</TableHead><TableHead className="text-right">Total Penjualan</TableHead><TableHead className="text-right">Transaksi</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {rekapHarian.map(r => {
+                    const isExpanded = expandedDates.has(r.tanggal);
+                    const rincianArr = Array.from(r.rincian.values()).sort((a, b) => a.nama.localeCompare(b.nama));
+                    return (
+                      <React.Fragment key={r.tanggal}>
+                        <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => toggleDate(r.tanggal)}>
+                          <TableCell className="w-8 px-2">{isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}</TableCell>
+                          <TableCell className="whitespace-nowrap font-medium">{r.tanggal}</TableCell>
+                          <TableCell className="text-right font-medium">{fmtN(r.totalKg)} kg</TableCell>
+                          <TableCell className="text-right font-medium">{r.totalPcs > 0 ? `${fmtN(r.totalPcs)} pcs` : '-'}</TableCell>
+                          <TableCell className="text-right font-medium text-blue-600">{fmtC(r.totalPenjualan)}</TableCell>
+                          <TableCell className="text-right">{r.jumlahTransaksi}</TableCell>
+                        </TableRow>
+                        {isExpanded && rincianArr.map(ri => (
+                          <TableRow key={`${r.tanggal}-${ri.nama}`} className="bg-indigo-50/50">
+                            <TableCell></TableCell>
+                            <TableCell className="pl-8 text-sm text-muted-foreground">{ri.nama}</TableCell>
+                            <TableCell className="text-right text-sm">{ri.isPcs ? '-' : `${fmtN(ri.qty)} kg`}</TableCell>
+                            <TableCell className="text-right text-sm">{ri.isPcs ? `${fmtN(ri.qty)} pcs` : '-'}</TableCell>
+                            <TableCell></TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell></TableCell>
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right">{fmtN(rekapHarian.reduce((s, r) => s + r.totalKg, 0))} kg</TableCell>
+                    <TableCell className="text-right">{rekapHarian.reduce((s, r) => s + r.totalPcs, 0) > 0 ? `${fmtN(rekapHarian.reduce((s, r) => s + r.totalPcs, 0))} pcs` : '-'}</TableCell>
+                    <TableCell className="text-right text-blue-600">{fmtC(rekapHarian.reduce((s, r) => s + r.totalPenjualan, 0))}</TableCell>
+                    <TableCell className="text-right">{rekapHarian.reduce((s, r) => s + r.jumlahTransaksi, 0)}</TableCell>
+                  </TableRow>
+                  {/* Grand total rincian */}
+                  {grandRincian.length > 0 && (
+                    <>
+                      <TableRow className="bg-muted/30">
+                        <TableCell></TableCell>
+                        <TableCell colSpan={5} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rincian Total Keseluruhan</TableCell>
+                      </TableRow>
+                      {grandRincian.map(ri => (
+                        <TableRow key={`grand-${ri.nama}`} className="bg-muted/30">
+                          <TableCell></TableCell>
+                          <TableCell className="pl-8 text-sm">{ri.nama}</TableCell>
+                          <TableCell className="text-right text-sm font-medium">{ri.isPcs ? '-' : `${fmtN(ri.qty)} kg`}</TableCell>
+                          <TableCell className="text-right text-sm font-medium">{ri.isPcs ? `${fmtN(ri.qty)} pcs` : '-'}</TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card><CardContent className="p-0">
         <Table>
@@ -158,11 +289,14 @@ export default function BarangKeluarDagingPage() {
                 <div><span className="text-muted-foreground">Keterangan:</span> <span className="font-medium">{viewingData.keterangan || '-'}</span></div>
               </div>
               <Table>
-                <TableHeader><TableRow><TableHead>Jenis Daging</TableHead><TableHead className="text-right">Berat (kg)</TableHead><TableHead className="text-right">Harga/kg</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Jenis Daging</TableHead><TableHead className="text-right">Berat/Qty</TableHead><TableHead className="text-right">Harga</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {viewingData.details.map((d, i) => (
-                    <TableRow key={i}><TableCell>{d.jenis_daging.nama_jenis}</TableCell><TableCell className="text-right">{fmtN(d.berat_kg)}</TableCell><TableCell className="text-right">{fmtC(d.harga_per_kg)}</TableCell><TableCell className="text-right">{fmtC(d.subtotal)}</TableCell></TableRow>
-                  ))}
+                  {viewingData.details.map((d, i) => {
+                    const isAti = d.jenis_daging.nama_jenis.toLowerCase().includes('ati') || d.jenis_daging.nama_jenis.toLowerCase().includes('hati ampela');
+                    return (
+                      <TableRow key={i}><TableCell>{d.jenis_daging.nama_jenis}</TableCell><TableCell className="text-right">{isAti ? `${fmtN(d.berat_kg)} pcs` : `${fmtN(d.berat_kg)} kg`}</TableCell><TableCell className="text-right">{fmtC(d.harga_per_kg)}{isAti ? '/pcs' : '/kg'}</TableCell><TableCell className="text-right">{fmtC(d.subtotal)}</TableCell></TableRow>
+                    );
+                  })}
                 </TableBody>
                 <TableFooter>
                   <TableRow><TableCell colSpan={3} className="text-right font-medium">Total Penjualan</TableCell><TableCell className="text-right font-bold text-blue-600">{fmtC(viewingData.total_penjualan)}</TableCell></TableRow>
@@ -182,28 +316,42 @@ export default function BarangKeluarDagingPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Tanggal <span className="text-red-500">*</span></Label><input type="date" value={formHeader.tanggal} onChange={(e) => setFormHeader({ ...formHeader, tanggal: e.target.value })} className={selectClass} required /></div>
-              <div className="space-y-2"><Label>Nama Customer <span className="text-red-500">*</span></Label><Input value={formHeader.nama_customer} onChange={(e) => setFormHeader({ ...formHeader, nama_customer: e.target.value })} required /></div>
+              <div className="space-y-2"><Label>Customer <span className="text-red-500">*</span></Label><select value={formHeader.customer_id} onChange={(e) => setFormHeader({ ...formHeader, customer_id: e.target.value })} className={selectClass} required><option value="">Pilih Customer</option>{customerList.map(c => <option key={c.id} value={c.id}>{c.nama}</option>)}</select></div>
               <div className="space-y-2"><Label>Pengeluaran</Label><Input type="number" value={formHeader.pengeluaran} onChange={(e) => setFormHeader({ ...formHeader, pengeluaran: e.target.value })} min={0} /></div>
             </div>
             <div className="space-y-2"><Label>Keterangan</Label><Textarea value={formHeader.keterangan} onChange={(e) => setFormHeader({ ...formHeader, keterangan: e.target.value })} rows={2} /></div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between"><Label className="text-base font-semibold">Detail Daging</Label><Button type="button" variant="outline" size="sm" onClick={addDetailRow}><PlusCircle className="w-4 h-4 mr-1" /> Tambah Baris</Button></div>
-              {formDetails.map((d, idx) => (
+              {formDetails.map((d, idx) => {
+                const pieceMode = isPerPiece(d.jenis_daging_id);
+                return (
                 <Card key={idx} className="p-3"><div className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-3 space-y-1"><Label className="text-xs">Jenis Daging</Label><select value={d.jenis_daging_id} onChange={(e) => updateDetail(idx, 'jenis_daging_id', e.target.value)} className={selectClass} required><option value="">Pilih</option>{jenisDagingList.map(j => <option key={j.id} value={j.id}>{j.nama_jenis}</option>)}</select></div>
-                  <div className="col-span-2 space-y-1"><Label className="text-xs">Berat (kg)</Label><Input type="number" step="0.01" value={d.berat_kg} onChange={(e) => updateDetail(idx, 'berat_kg', e.target.value)} required /></div>
-                  <div className="col-span-3 space-y-1"><Label className="text-xs">Harga/kg</Label><Input type="number" value={d.harga_per_kg} onChange={(e) => updateDetail(idx, 'harga_per_kg', e.target.value)} required /></div>
+                  <div className="col-span-2 space-y-1"><Label className="text-xs">{pieceMode ? 'Jumlah (pcs)' : 'Berat (kg)'}</Label><Input type="number" step={pieceMode ? '1' : '0.01'} min={pieceMode ? '1' : '0'} value={d.berat_kg} onChange={(e) => updateDetail(idx, 'berat_kg', e.target.value)} required /></div>
+                  <div className="col-span-3 space-y-1"><Label className="text-xs">{pieceMode ? 'Harga/pcs' : 'Harga/kg'}</Label><Input type="number" value={d.harga_per_kg} onChange={(e) => updateDetail(idx, 'harga_per_kg', e.target.value)} required /></div>
                   <div className="col-span-3 space-y-1"><Label className="text-xs">Subtotal</Label><p className="text-sm font-medium py-2">{fmtC(d.subtotal)}</p></div>
                   <div className="col-span-1 flex justify-center">{formDetails.length > 1 && <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => removeDetailRow(idx)}><MinusCircle className="w-4 h-4" /></Button>}</div>
                 </div></Card>
-              ))}
+                );
+              })}
+            </div>
+
+            {/* Payment Section */}
+            <div className="rounded-md border border-amber-200 bg-amber-50/50 p-4 space-y-3">
+              <p className="font-semibold text-amber-800 text-sm">Pembayaran</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label className="text-xs">Jumlah Bayar</Label><Input type="number" placeholder="Bayar lunas" value={formHeader.jumlah_bayar} onChange={(e) => setFormHeader({ ...formHeader, jumlah_bayar: e.target.value })} min={0} /><p className="text-xs text-muted-foreground">Kosongkan jika bayar lunas</p></div>
+                <div className="space-y-2"><Label className="text-xs">Metode Pembayaran</Label><select value={formHeader.metode_pembayaran} onChange={(e) => setFormHeader({ ...formHeader, metode_pembayaran: e.target.value })} className={selectClass}><option value="CASH">Cash</option><option value="TRANSFER">Transfer</option><option value="CAMPUR">Campur</option></select></div>
+              </div>
             </div>
 
             <Card className="bg-muted/50"><CardContent className="pt-4 space-y-1 text-sm">
               <div className="flex justify-between"><span>Total Penjualan:</span><span className="font-bold text-blue-600">{fmtC(calculatedTotal)}</span></div>
               <div className="flex justify-between"><span>Pengeluaran:</span><span className="text-red-600">{fmtC(parseFloat(formHeader.pengeluaran) || 0)}</span></div>
               <div className="flex justify-between border-t pt-1"><span className="font-medium">Saldo:</span><span className={`font-bold ${calculatedSaldo >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtC(calculatedSaldo)}</span></div>
+              <div className="flex justify-between border-t pt-1"><span>Jumlah Bayar:</span><span className="font-bold text-emerald-600">{fmtC(calculatedJumlahBayar)}</span></div>
+              {calculatedSisaPiutang > 0 && <div className="flex justify-between"><span>Sisa Piutang:</span><span className="font-bold text-amber-600">{fmtC(calculatedSisaPiutang)}</span></div>}
             </CardContent></Card>
 
             <DialogFooter className="gap-2">

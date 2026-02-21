@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { ChevronRight, Calendar, LogOut, KeyRound } from 'lucide-react';
 
 const labelMap: Record<string, string> = {
@@ -31,6 +32,7 @@ function formatDate(): string {
 interface UserInfo {
   nama: string;
   initial: string;
+  foto_profil: string | null;
 }
 
 export default function UserNavbar() {
@@ -38,7 +40,7 @@ export default function UserNavbar() {
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [todayDate, setTodayDate] = useState('');
-  const [userInfo, setUserInfo] = useState<UserInfo>({ nama: 'User', initial: 'U' });
+  const [userInfo, setUserInfo] = useState<UserInfo>({ nama: 'User', initial: 'U', foto_profil: null });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function UserNavbar() {
           const data = await res.json();
           if (data.success && data.user) {
             const nama = data.user.karyawan?.nama || data.user.name || 'User';
-            setUserInfo({ nama, initial: nama.charAt(0).toUpperCase() });
+            setUserInfo({ nama, initial: nama.charAt(0).toUpperCase(), foto_profil: data.user.karyawan?.foto_profil || null });
           }
         }
       } catch {}
@@ -102,8 +104,12 @@ export default function UserNavbar() {
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100/80 transition-colors duration-150"
             >
-              <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
-                <span className="text-white text-xs font-bold">{userInfo.initial}</span>
+              <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm overflow-hidden">
+                {userInfo.foto_profil ? (
+                  <Image src={userInfo.foto_profil} alt="Foto" width={32} height={32} className="w-full h-full object-cover" unoptimized />
+                ) : (
+                  <span className="text-white text-xs font-bold">{userInfo.initial}</span>
+                )}
               </div>
               <div className="hidden lg:block text-left">
                 <p className="text-xs font-medium text-gray-700 leading-tight truncate max-w-30">{userInfo.nama}</p>

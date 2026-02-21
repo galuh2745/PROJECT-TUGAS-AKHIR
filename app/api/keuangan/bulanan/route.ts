@@ -45,24 +45,44 @@ export async function GET(req: Request) {
     const endDate = new Date(year, month, 1); // First day of next month
 
     // ==================== PEMASUKAN ====================
+    // Revenue ONLY from Penjualan (linked to BarangKeluar) + PembayaranPiutang
 
-    const penjualanDaging = await prisma.barangKeluarDaging.aggregate({
+    const penjualanDagingBulanan = await prisma.penjualan.aggregate({
+      where: {
+        tanggal: { gte: startDate, lt: endDate },
+        jenis_transaksi: 'DAGING',
+      },
+      _sum: { jumlah_bayar: true },
+    });
+
+    const penjualanAyamHidupBulanan = await prisma.penjualan.aggregate({
+      where: {
+        tanggal: { gte: startDate, lt: endDate },
+        jenis_transaksi: 'AYAM_HIDUP',
+      },
+      _sum: { jumlah_bayar: true },
+    });
+
+    const penjualanBulananAll = await prisma.penjualan.aggregate({
       where: {
         tanggal: { gte: startDate, lt: endDate },
       },
-      _sum: { saldo: true },
+      _sum: { sisa_piutang: true },
     });
 
-    const penjualanAyamHidup = await prisma.barangKeluarAyamHidup.aggregate({
+    // Pembayaran Piutang → kas masuk dari pelunasan hutang
+    const pembayaranPiutangBulanan = await prisma.pembayaranPiutang.aggregate({
       where: {
         tanggal: { gte: startDate, lt: endDate },
       },
-      _sum: { total_penjualan: true },
+      _sum: { jumlah_bayar: true },
     });
 
-    const totalPenjualanDaging = parseFloat(penjualanDaging._sum.saldo?.toString() || '0');
-    const totalPenjualanAyamHidup = parseFloat(penjualanAyamHidup._sum.total_penjualan?.toString() || '0');
-    const totalPemasukan = totalPenjualanDaging + totalPenjualanAyamHidup;
+    const kasMasukDaging = parseFloat(penjualanDagingBulanan._sum.jumlah_bayar?.toString() || '0');
+    const kasMasukAyamHidup = parseFloat(penjualanAyamHidupBulanan._sum.jumlah_bayar?.toString() || '0');
+    const kasMasukPelunasan = parseFloat(pembayaranPiutangBulanan._sum.jumlah_bayar?.toString() || '0');
+    const piutangBaruBulanan = parseFloat(penjualanBulananAll._sum.sisa_piutang?.toString() || '0');
+    const totalPemasukan = kasMasukDaging + kasMasukAyamHidup + kasMasukPelunasan;
 
     // ==================== PENGELUARAN ====================
 
@@ -138,15 +158,7 @@ export async function GET(req: Request) {
       today.setHours(23, 59, 59, 999);
       if (dayStart > today) break;
 
-      const [dagingDay, ayamHidupDay, beliDay, penDagingDay, penAyamHidupDay] = await Promise.all([
-        prisma.barangKeluarDaging.aggregate({
-          where: { tanggal: { gte: dayStart, lt: dayEnd } },
-          _sum: { saldo: true },
-        }),
-        prisma.barangKeluarAyamHidup.aggregate({
-          where: { tanggal: { gte: dayStart, lt: dayEnd } },
-          _sum: { total_penjualan: true },
-        }),
+      const [beliDay, penDagingDay, penAyamHidupDay, penjualanDay, pelunasanDay] = await Promise.all([
         prisma.barangMasuk.aggregate({
           where: { tanggal_masuk: { gte: dayStart, lt: dayEnd } },
           _sum: { total_harga: true },
@@ -158,6 +170,14 @@ export async function GET(req: Request) {
         prisma.barangKeluarAyamHidup.aggregate({
           where: { tanggal: { gte: dayStart, lt: dayEnd } },
           _sum: { pengeluaran: true },
+        }),
+        prisma.penjualan.aggregate({
+          where: { tanggal: { gte: dayStart, lt: dayEnd } },
+          _sum: { jumlah_bayar: true },
+        }),
+        prisma.pembayaranPiutang.aggregate({
+          where: { tanggal: { gte: dayStart, lt: dayEnd } },
+          _sum: { jumlah_bayar: true },
         }),
       ]);
 
@@ -184,9 +204,10 @@ export async function GET(req: Request) {
         }
       }
 
-      const pemasukanDay =
-        parseFloat(dagingDay._sum.saldo?.toString() || '0') +
-        parseFloat(ayamHidupDay._sum.total_penjualan?.toString() || '0');
+      const kasMasukPenjualanDay = parseFloat(penjualanDay._sum.jumlah_bayar?.toString() || '0');
+      const kasMasukPelunasanDay = parseFloat(pelunasanDay._sum.jumlah_bayar?.toString() || '0');
+
+      const pemasukanDay = kasMasukPenjualanDay + kasMasukPelunasanDay;
 
       const pengeluaranDay =
         parseFloat(beliDay._sum.total_harga?.toString() || '0') +
@@ -208,13 +229,20 @@ export async function GET(req: Request) {
       }
     }
 
+    // Total piutang aktif
+    const totalPiutangAktifBulanan = await prisma.penjualan.aggregate({
+      where: { sisa_piutang: { gt: 0 } },
+      _sum: { sisa_piutang: true },
+    });
+
     return NextResponse.json({
       success: true,
       data: {
         bulan: monthParam,
         pemasukan: {
-          penjualan_daging: totalPenjualanDaging,
-          penjualan_ayam_hidup: totalPenjualanAyamHidup,
+          penjualan_daging: kasMasukDaging,
+          penjualan_ayam_hidup: kasMasukAyamHidup,
+          kas_masuk_pelunasan: kasMasukPelunasan,
           total: totalPemasukan,
         },
         pengeluaran: {
@@ -225,6 +253,11 @@ export async function GET(req: Request) {
           total: totalPengeluaran,
         },
         saldo_bulanan: saldoBulanan,
+        piutang: {
+          piutang_baru: piutangBaruBulanan,
+          pelunasan: kasMasukPelunasan,
+          total_piutang_aktif: parseFloat(totalPiutangAktifBulanan._sum.sisa_piutang?.toString() || '0'),
+        },
         rekap_harian: rekapHarian,
       },
     });

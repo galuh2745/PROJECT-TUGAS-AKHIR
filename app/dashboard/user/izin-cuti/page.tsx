@@ -78,7 +78,7 @@ export default function IzinCutiPage() {
           <h1 className="text-2xl font-bold text-foreground">Izin & Cuti</h1>
           <p className="text-muted-foreground text-sm mt-1">Ajukan permohonan izin atau cuti</p>
         </div>
-        <Button onClick={() => setShowModal(true)} className="bg-[#8B6B1F] hover:bg-[#A67C00]">
+        <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md rounded-lg">
           <Plus className="w-4 h-4 mr-2" /> Ajukan Baru
         </Button>
       </div>
@@ -150,7 +150,7 @@ export default function IzinCutiPage() {
             </div>
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Batal</Button>
-              <Button type="submit" disabled={actionLoading} className="bg-[#8B6B1F] hover:bg-[#A67C00]">
+              <Button type="submit" disabled={actionLoading} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md rounded-lg">
                 {actionLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Memproses...</> : 'Ajukan'}
               </Button>
             </DialogFooter>

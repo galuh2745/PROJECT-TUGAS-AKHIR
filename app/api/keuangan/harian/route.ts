@@ -44,27 +44,48 @@ export async function GET(req: Request) {
     const nextDate = new Date(dateParam);
     nextDate.setDate(nextDate.getDate() + 1);
 
-    // ==================== PEMASUKAN ====================
+    // ==================== KAS MASUK (PEMASUKAN NYATA) ====================
+    // Revenue ONLY from Penjualan (linked to BarangKeluar) + PembayaranPiutang
+    // NO double counting - BarangKeluar.total_penjualan/saldo NOT used for revenue
 
-    // 1. Penjualan Daging Ayam → barang_keluar_daging.saldo
-    const penjualanDaging = await prisma.barangKeluarDaging.aggregate({
+    // 1. Penjualan (kas masuk dari penjualan hari ini)
+    const penjualanHariIni = await prisma.penjualan.aggregate({
       where: {
         tanggal: { gte: targetDate, lt: nextDate },
       },
-      _sum: { saldo: true },
+      _sum: { jumlah_bayar: true, total_penjualan: true, sisa_piutang: true },
     });
 
-    // 2. Penjualan Ayam Hidup → barang_keluar_ayam_hidup.total_penjualan
-    const penjualanAyamHidup = await prisma.barangKeluarAyamHidup.aggregate({
+    // 1a. Penjualan by jenis_transaksi (for breakdown)
+    const penjualanDagingAgg = await prisma.penjualan.aggregate({
+      where: {
+        tanggal: { gte: targetDate, lt: nextDate },
+        jenis_transaksi: 'DAGING',
+      },
+      _sum: { jumlah_bayar: true },
+    });
+
+    const penjualanAyamHidupAgg = await prisma.penjualan.aggregate({
+      where: {
+        tanggal: { gte: targetDate, lt: nextDate },
+        jenis_transaksi: 'AYAM_HIDUP',
+      },
+      _sum: { jumlah_bayar: true },
+    });
+
+    // 2. Pembayaran Piutang → kas masuk dari pelunasan hutang
+    const pembayaranPiutang = await prisma.pembayaranPiutang.aggregate({
       where: {
         tanggal: { gte: targetDate, lt: nextDate },
       },
-      _sum: { total_penjualan: true },
+      _sum: { jumlah_bayar: true },
     });
 
-    const totalPenjualanDaging = parseFloat(penjualanDaging._sum.saldo?.toString() || '0');
-    const totalPenjualanAyamHidup = parseFloat(penjualanAyamHidup._sum.total_penjualan?.toString() || '0');
-    const totalPemasukan = totalPenjualanDaging + totalPenjualanAyamHidup;
+    const kasMasukDaging = parseFloat(penjualanDagingAgg._sum.jumlah_bayar?.toString() || '0');
+    const kasMasukAyamHidup = parseFloat(penjualanAyamHidupAgg._sum.jumlah_bayar?.toString() || '0');
+    const kasMasukPelunasan = parseFloat(pembayaranPiutang._sum.jumlah_bayar?.toString() || '0');
+
+    const totalKasMasuk = kasMasukDaging + kasMasukAyamHidup + kasMasukPelunasan;
 
     // ==================== PENGELUARAN ====================
 
@@ -93,9 +114,6 @@ export async function GET(req: Request) {
     });
 
     // 4. Ayam Mati TIDAK BISA CLAIM → hitung kerugian
-    //    BW = total_kg / jumlah_ekor (dari barang_masuk)
-    //    nilai_per_ekor = BW × harga_per_kg
-    //    kerugian = jumlah_ekor_mati × nilai_per_ekor
     const ayamMatiTidakBisaClaim = await prisma.ayamMati.findMany({
       where: {
         tanggal: { gte: targetDate, lt: nextDate },
@@ -108,7 +126,6 @@ export async function GET(req: Request) {
 
     let totalKerugianAyamMati = 0;
     for (const am of ayamMatiTidakBisaClaim) {
-      // Cari barang masuk terdekat dari perusahaan yang sama pada/sebelum tanggal ayam mati
       const barangMasukRef = await prisma.barangMasuk.findFirst({
         where: {
           perusahaan_id: am.perusahaan_id,
@@ -134,16 +151,31 @@ export async function GET(req: Request) {
     const totalPengeluaran =
       totalBeliAyam + totalPengeluaranDaging + totalPengeluaranAyamHidup + totalKerugianAyamMati;
 
-    const saldoHarian = totalPemasukan - totalPengeluaran;
+    const saldoHarian = totalKasMasuk - totalPengeluaran;
+
+    // ==================== PIUTANG ====================
+
+    // Piutang baru hari ini (sisa_piutang dari penjualan hari ini)
+    const piutangBaru = parseFloat(penjualanHariIni._sum.sisa_piutang?.toString() || '0');
+
+    // Pelunasan hari ini
+    const pelunasanHariIni = kasMasukPelunasan;
+
+    // Total piutang aktif (all time)
+    const totalPiutangAktif = await prisma.penjualan.aggregate({
+      where: { sisa_piutang: { gt: 0 } },
+      _sum: { sisa_piutang: true },
+    });
 
     return NextResponse.json({
       success: true,
       data: {
         tanggal: dateParam,
         pemasukan: {
-          penjualan_daging: totalPenjualanDaging,
-          penjualan_ayam_hidup: totalPenjualanAyamHidup,
-          total: totalPemasukan,
+          penjualan_daging: kasMasukDaging,
+          penjualan_ayam_hidup: kasMasukAyamHidup,
+          kas_masuk_pelunasan: kasMasukPelunasan,
+          total: totalKasMasuk,
         },
         pengeluaran: {
           beli_ayam: totalBeliAyam,
@@ -153,6 +185,11 @@ export async function GET(req: Request) {
           total: totalPengeluaran,
         },
         saldo_harian: saldoHarian,
+        piutang: {
+          piutang_baru: piutangBaru,
+          pelunasan: pelunasanHariIni,
+          total_piutang_aktif: parseFloat(totalPiutangAktif._sum.sisa_piutang?.toString() || '0'),
+        },
       },
     });
   } catch (error) {

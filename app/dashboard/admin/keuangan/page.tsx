@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  FileDown,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,8 @@ import { StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 interface PemasukanDetail {
   penjualan_daging: number;
   penjualan_ayam_hidup: number;
+  kas_masuk_penjualan?: number;
+  kas_masuk_pelunasan?: number;
   total: number;
 }
 
@@ -39,11 +42,18 @@ interface PengeluaranDetail {
   total: number;
 }
 
+interface PiutangDetail {
+  piutang_baru: number;
+  pelunasan: number;
+  total_piutang_aktif: number;
+}
+
 interface KeuanganHarian {
   tanggal: string;
   pemasukan: PemasukanDetail;
   pengeluaran: PengeluaranDetail;
   saldo_harian: number;
+  piutang?: PiutangDetail;
 }
 
 interface RekapHarianItem {
@@ -58,6 +68,7 @@ interface KeuanganBulanan {
   pemasukan: PemasukanDetail;
   pengeluaran: PengeluaranDetail;
   saldo_bulanan: number;
+  piutang?: PiutangDetail;
   rekap_harian: RekapHarianItem[];
 }
 
@@ -129,75 +140,90 @@ function SummaryCards({
   pengeluaran,
   saldo,
   label,
+  piutang,
 }: {
   pemasukan: PemasukanDetail;
   pengeluaran: PengeluaranDetail;
   saldo: number;
   label: string;
+  piutang?: PiutangDetail;
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Card className="border-l-4 border-l-emerald-500">
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Pemasukan</p>
-              <p className="text-2xl font-bold text-emerald-600">{formatRupiah(pemasukan.total)}</p>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Kas Masuk</p>
+                <p className="text-2xl font-bold text-emerald-600">{formatRupiah(pemasukan.total)}</p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                <ArrowUpRight className="h-5 w-5 text-emerald-600" />
+              </div>
             </div>
-            <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-              <ArrowUpRight className="h-5 w-5 text-emerald-600" />
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Penjualan Daging</span>
+                <span className="font-medium">{formatRupiah(pemasukan.penjualan_daging)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Penjualan Ayam Hidup</span>
+                <span className="font-medium">{formatRupiah(pemasukan.penjualan_ayam_hidup)}</span>
+              </div>
+              {(pemasukan.kas_masuk_penjualan !== undefined && pemasukan.kas_masuk_penjualan > 0) && (
+                <div className="flex justify-between">
+                  <span>Kas Masuk Penjualan</span>
+                  <span className="font-medium">{formatRupiah(pemasukan.kas_masuk_penjualan)}</span>
+                </div>
+              )}
+              {(pemasukan.kas_masuk_pelunasan !== undefined && pemasukan.kas_masuk_pelunasan > 0) && (
+                <div className="flex justify-between">
+                  <span>Pelunasan Piutang</span>
+                  <span className="font-medium">{formatRupiah(pemasukan.kas_masuk_pelunasan)}</span>
+                </div>
+              )}
             </div>
-          </div>
-          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-            <div className="flex justify-between">
-              <span>Penjualan Daging</span>
-              <span className="font-medium">{formatRupiah(pemasukan.penjualan_daging)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Penjualan Ayam Hidup</span>
-              <span className="font-medium">{formatRupiah(pemasukan.penjualan_ayam_hidup)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card className="border-l-4 border-l-red-500">
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Pengeluaran</p>
-              <p className="text-2xl font-bold text-red-600">{formatRupiah(pengeluaran.total)}</p>
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Pengeluaran</p>
+                <p className="text-2xl font-bold text-red-600">{formatRupiah(pengeluaran.total)}</p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                <ArrowDownRight className="h-5 w-5 text-red-600" />
+              </div>
             </div>
-            <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-              <ArrowDownRight className="h-5 w-5 text-red-600" />
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Beli Ayam</span>
+                <span className="font-medium">{formatRupiah(pengeluaran.beli_ayam)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Operasional Daging</span>
+                <span className="font-medium">{formatRupiah(pengeluaran.operasional_daging)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Operasional Ayam Hidup</span>
+                <span className="font-medium">{formatRupiah(pengeluaran.operasional_ayam_hidup)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Kerugian Ayam Mati</span>
+                <span className="font-medium">{formatRupiah(pengeluaran.kerugian_ayam_mati)}</span>
+              </div>
             </div>
-          </div>
-          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-            <div className="flex justify-between">
-              <span>Beli Ayam</span>
-              <span className="font-medium">{formatRupiah(pengeluaran.beli_ayam)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Operasional Daging</span>
-              <span className="font-medium">{formatRupiah(pengeluaran.operasional_daging)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Operasional Ayam Hidup</span>
-              <span className="font-medium">{formatRupiah(pengeluaran.operasional_ayam_hidup)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Kerugian Ayam Mati</span>
-              <span className="font-medium">{formatRupiah(pengeluaran.kerugian_ayam_mati)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card className={`border-l-4 ${saldo >= 0 ? 'border-l-blue-500' : 'border-l-orange-500'}`}>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Saldo {label}</p>
+        <Card className={`border-l-4 ${saldo >= 0 ? 'border-l-blue-500' : 'border-l-orange-500'}`}>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Saldo {label}</p>
               <p className={`text-2xl font-bold ${saldo >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
                 {formatRupiah(saldo)}
               </p>
@@ -217,6 +243,34 @@ function SummaryCards({
           <p className="mt-2 text-xs text-muted-foreground">Pemasukan - Pengeluaran</p>
         </CardContent>
       </Card>
+    </div>
+
+    {/* Piutang Card */}
+    {piutang && (
+      <Card className="border-l-4 border-l-amber-500">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Piutang Aktif</p>
+              <p className="text-2xl font-bold text-amber-600">{formatRupiah(piutang.total_piutang_aktif)}</p>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+              <DollarSign className="h-5 w-5 text-amber-600" />
+            </div>
+          </div>
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <div className="flex justify-between">
+              <span>Piutang Baru</span>
+              <span className="font-medium text-red-500">{formatRupiah(piutang.piutang_baru)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Pelunasan</span>
+              <span className="font-medium text-emerald-500">{formatRupiah(piutang.pelunasan)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )}
     </div>
   );
 }
@@ -260,6 +314,9 @@ function TabHarian() {
           <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
+        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => window.open(`/api/keuangan/harian/pdf?date=${date}`, '_blank')}>
+          <FileDown className="h-4 w-4 mr-1" /> Export PDF
+        </Button>
       </div>
 
       {loading ? (
@@ -267,7 +324,7 @@ function TabHarian() {
           <LoadingSpinner />
         </div>
       ) : data ? (
-        <SummaryCards pemasukan={data.pemasukan} pengeluaran={data.pengeluaran} saldo={data.saldo_harian} label="Harian" />
+        <SummaryCards pemasukan={data.pemasukan} pengeluaran={data.pengeluaran} saldo={data.saldo_harian} label="Harian" piutang={data.piutang} />
       ) : (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">Tidak ada data</CardContent>
@@ -316,6 +373,9 @@ function TabBulanan() {
           <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
+        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => window.open(`/api/keuangan/bulanan/pdf?month=${month}`, '_blank')}>
+          <FileDown className="h-4 w-4 mr-1" /> Export PDF
+        </Button>
       </div>
 
       {loading ? (
@@ -329,6 +389,7 @@ function TabBulanan() {
             pengeluaran={data.pengeluaran}
             saldo={data.saldo_bulanan}
             label="Bulanan"
+            piutang={data.piutang}
           />
 
           {/* Rekap Harian */}
@@ -441,6 +502,9 @@ function TabTahunan() {
         <Button onClick={fetchData} variant="outline" size="sm" disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
           Refresh
+        </Button>
+        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => window.open(`/api/keuangan/tahunan/pdf?year=${year}`, '_blank')}>
+          <FileDown className="h-4 w-4 mr-1" /> Export PDF
         </Button>
       </div>
 

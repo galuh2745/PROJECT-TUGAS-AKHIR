@@ -10,7 +10,7 @@ datasource db {
 model User {
   id                  BigInt    @id @default(autoincrement())
   name                String    @db.VarChar(255)
-  email               String?   @db.VarChar(255)
+  email               String?   @unique @db.VarChar(255)
   password            String    @db.VarChar(255)
   role                Role      @default(USER)
   created_at          DateTime  @default(now())
@@ -43,6 +43,7 @@ model Karyawan {
   jenis_karyawan_id BigInt
   no_hp             String         @db.VarChar(20)
   alamat            String         @db.Text
+  foto_profil       String?        @db.VarChar(500)
   status            StatusKaryawan @default(AKTIF)
   created_at        DateTime       @default(now())
   updated_at        DateTime       @updatedAt
@@ -268,4 +269,53 @@ enum StatusClaim {
   TIDAK_BISA
 
   @@map("ayam_mati_status_claim")
+}
+
+// ==================== PIUTANG SYSTEM ====================
+
+model Customer {
+  id            BigInt              @id @default(autoincrement())
+  nama          String              @db.VarChar(255)
+  no_hp         String?             @db.VarChar(50)
+  alamat        String?             @db.Text
+  created_at    DateTime            @default(now())
+  penjualan     Penjualan[]
+  pembayaran    PembayaranPiutang[]
+
+  @@map("customers")
+}
+
+model Penjualan {
+  id                BigInt   @id @default(autoincrement())
+  customer_id       BigInt
+  tanggal           DateTime @db.Date
+  jenis_transaksi   String   @default("MANUAL") @db.VarChar(20) // AYAM_HIDUP / DAGING / MANUAL
+  total_penjualan   Decimal  @db.Decimal(15, 2)
+  jumlah_bayar      Decimal  @db.Decimal(15, 2)
+  sisa_piutang      Decimal  @db.Decimal(15, 2)
+  metode_pembayaran String   @db.VarChar(20) // CASH / TRANSFER / CAMPUR
+  keterangan        String?  @db.Text
+  created_at        DateTime @default(now())
+
+  customer          Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@index([tanggal])
+  @@map("penjualan")
+}
+
+model PembayaranPiutang {
+  id            BigInt   @id @default(autoincrement())
+  customer_id   BigInt
+  tanggal       DateTime @db.Date
+  jumlah_bayar  Decimal  @db.Decimal(15, 2)
+  metode        String   @db.VarChar(20) // CASH / TRANSFER
+  keterangan    String?  @db.Text
+  created_at    DateTime @default(now())
+
+  customer      Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@index([tanggal])
+  @@map("pembayaran_piutang")
 }

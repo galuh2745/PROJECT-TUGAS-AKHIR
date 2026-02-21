@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, AlertTriangle, FileDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,7 +51,7 @@ export default function AyamMatiPage() {
     } catch { toast.error('Terjadi kesalahan'); } finally { setLoading(false); }
   };
 
-  const openAddModal = () => { setModalMode('add'); setFormData({ perusahaan_id: '', tanggal: new Date().toISOString().split('T')[0], jumlah_ekor: '', keterangan: '' }); setSelectedData(null); setShowModal(true); };
+  const openAddModal = () => { setModalMode('add'); const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; setFormData({ perusahaan_id: '', tanggal: localDate, jumlah_ekor: '', keterangan: '' }); setSelectedData(null); setShowModal(true); };
   const openEditModal = (item: AyamMati) => { setModalMode('edit'); setFormData({ perusahaan_id: item.perusahaan_id, tanggal: item.tanggal, jumlah_ekor: item.jumlah_ekor.toString(), keterangan: item.keterangan || '' }); setSelectedData(item); setShowModal(true); };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,12 +81,15 @@ export default function AyamMatiPage() {
 
         {/* Filters */}
         <Card className="mt-4"><CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="space-y-2"><Label>Perusahaan</Label><select value={filterPerusahaan} onChange={(e) => setFilterPerusahaan(e.target.value)} className={selectClass}><option value="">Semua</option>{perusahaanList.map(p => <option key={p.id} value={p.id}>{p.nama_perusahaan}</option>)}</select></div>
-            <div className="space-y-2"><Label>Tanggal Dari</Label><input type="date" value={filterTanggalDari} onChange={(e) => setFilterTanggalDari(e.target.value)} className={selectClass} /></div>
-            <div className="space-y-2"><Label>Tanggal Sampai</Label><input type="date" value={filterTanggalSampai} onChange={(e) => setFilterTanggalSampai(e.target.value)} className={selectClass} /></div>
-            {activeTab === 'data' && <div className="space-y-2"><Label>Status Klaim</Label><select value={filterStatusClaim} onChange={(e) => setFilterStatusClaim(e.target.value)} className={selectClass}><option value="">Semua</option><option value="BISA_CLAIM">Bisa Klaim</option><option value="TIDAK_BISA">Tidak Bisa</option></select></div>}
-            {activeTab === 'data' && <div className="flex items-end"><Button className="w-full" onClick={openAddModal}><Plus className="w-4 h-4 mr-2" /> Tambah Data</Button></div>}
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="w-full md:flex-1 space-y-2"><Label>Perusahaan</Label><select value={filterPerusahaan} onChange={(e) => setFilterPerusahaan(e.target.value)} className={selectClass}><option value="">Semua</option>{perusahaanList.map(p => <option key={p.id} value={p.id}>{p.nama_perusahaan}</option>)}</select></div>
+            <div className="w-full md:flex-1 space-y-2"><Label>Tanggal Dari</Label><input type="date" value={filterTanggalDari} onChange={(e) => setFilterTanggalDari(e.target.value)} className={selectClass} /></div>
+            <div className="w-full md:flex-1 space-y-2"><Label>Tanggal Sampai</Label><input type="date" value={filterTanggalSampai} onChange={(e) => setFilterTanggalSampai(e.target.value)} className={selectClass} /></div>
+            {activeTab === 'data' && <div className="w-full md:flex-1 space-y-2"><Label>Status Klaim</Label><select value={filterStatusClaim} onChange={(e) => setFilterStatusClaim(e.target.value)} className={selectClass}><option value="">Semua</option><option value="BISA_CLAIM">Bisa Klaim</option><option value="TIDAK_BISA">Tidak Bisa</option></select></div>}
+            <div className="flex gap-2 shrink-0">
+              {activeTab === 'data' && <Button onClick={openAddModal}><Plus className="w-4 h-4 mr-2" /> Tambah Data</Button>}
+              <Button variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700" onClick={() => { const p = new URLSearchParams(); if (filterPerusahaan) p.set('perusahaan_id', filterPerusahaan); if (filterTanggalDari) p.set('tanggal_dari', filterTanggalDari); if (filterTanggalSampai) p.set('tanggal_sampai', filterTanggalSampai); window.open(`/api/inventory/ayam-mati/pdf?${p}`, '_blank'); }}><FileDown className="w-4 h-4 mr-2" /> PDF</Button>
+            </div>
           </div>
         </CardContent></Card>
 

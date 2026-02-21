@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, FileDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,7 @@ export default function BarangMasukPage() {
     } catch { toast.error('Terjadi kesalahan'); } finally { setLoading(false); }
   };
 
-  const openAddModal = () => { setModalMode('add'); setFormData({ perusahaan_id: '', tanggal_masuk: new Date().toISOString().split('T')[0], jumlah_ekor: '', total_kg: '', harga_per_kg: '', tanggal_pembayaran: '', jumlah_transfer: '0', nama_kandang: '', alamat_kandang: '', no_mobil: '', nama_supir: '' }); setSelectedData(null); setShowModal(true); };
+  const openAddModal = () => { setModalMode('add'); const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; setFormData({ perusahaan_id: '', tanggal_masuk: localDate, jumlah_ekor: '', total_kg: '', harga_per_kg: '', tanggal_pembayaran: '', jumlah_transfer: '0', nama_kandang: '', alamat_kandang: '', no_mobil: '', nama_supir: '' }); setSelectedData(null); setShowModal(true); };
   const openEditModal = (item: BarangMasuk) => { setModalMode('edit'); setFormData({ perusahaan_id: item.perusahaan_id, tanggal_masuk: item.tanggal_masuk, jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), harga_per_kg: item.harga_per_kg.toString(), tanggal_pembayaran: item.tanggal_pembayaran || '', jumlah_transfer: item.jumlah_transfer.toString(), nama_kandang: item.nama_kandang, alamat_kandang: item.alamat_kandang || '', no_mobil: item.no_mobil || '', nama_supir: item.nama_supir || '' }); setSelectedData(item); setShowModal(true); };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,11 +82,14 @@ export default function BarangMasukPage() {
       <div><h1 className="text-2xl font-bold text-foreground">Barang Masuk</h1><p className="text-muted-foreground text-sm mt-1">Pencatatan ayam hidup masuk dari perusahaan supplier</p></div>
 
       <Card><CardContent className="pt-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="space-y-2"><Label>Perusahaan</Label><select value={filterPerusahaan} onChange={(e) => setFilterPerusahaan(e.target.value)} className={selectClass}><option value="">Semua Perusahaan</option>{perusahaanList.map(p => <option key={p.id} value={p.id}>{p.nama_perusahaan}</option>)}</select></div>
-          <div className="space-y-2"><Label>Tanggal Dari</Label><input type="date" value={filterTanggalDari} onChange={(e) => setFilterTanggalDari(e.target.value)} className={selectClass} /></div>
-          <div className="space-y-2"><Label>Tanggal Sampai</Label><input type="date" value={filterTanggalSampai} onChange={(e) => setFilterTanggalSampai(e.target.value)} className={selectClass} /></div>
-          <div className="flex items-end"><Button className="w-full" onClick={openAddModal}><Plus className="w-4 h-4 mr-2" /> Tambah Barang Masuk</Button></div>
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="w-full md:flex-1 space-y-2"><Label>Perusahaan</Label><select value={filterPerusahaan} onChange={(e) => setFilterPerusahaan(e.target.value)} className={selectClass}><option value="">Semua Perusahaan</option>{perusahaanList.map(p => <option key={p.id} value={p.id}>{p.nama_perusahaan}</option>)}</select></div>
+          <div className="w-full md:flex-1 space-y-2"><Label>Tanggal Dari</Label><input type="date" value={filterTanggalDari} onChange={(e) => setFilterTanggalDari(e.target.value)} className={selectClass} /></div>
+          <div className="w-full md:flex-1 space-y-2"><Label>Tanggal Sampai</Label><input type="date" value={filterTanggalSampai} onChange={(e) => setFilterTanggalSampai(e.target.value)} className={selectClass} /></div>
+          <div className="flex gap-2 shrink-0">
+            <Button onClick={openAddModal}><Plus className="w-4 h-4 mr-2" /> Tambah Data</Button>
+            <Button variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700" onClick={() => { const p = new URLSearchParams(); if (filterPerusahaan) p.set('perusahaan_id', filterPerusahaan); if (filterTanggalDari) p.set('tanggal_dari', filterTanggalDari); if (filterTanggalSampai) p.set('tanggal_sampai', filterTanggalSampai); window.open(`/api/inventory/barang-masuk/pdf?${p}`, '_blank'); }}><FileDown className="w-4 h-4 mr-2" /> PDF</Button>
+          </div>
         </div>
       </CardContent></Card>
 

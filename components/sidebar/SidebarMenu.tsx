@@ -4,7 +4,18 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { MenuItem, MenuGroup } from './types';
-import { ChevronDownIcon, ChevronRightIcon } from './icons';
+import { ChevronDownIcon } from './icons';
+
+// ─── Tooltip for collapsed mode ─────────────────────────────────────────────
+const Tooltip: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div className="relative group">
+    {children}
+    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg shadow-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50">
+      {label}
+      <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
+    </div>
+  </div>
+);
 
 // ─── Grandchild (3rd level) ─────────────────────────────────────────────────
 const SidebarGrandchildItem: React.FC<{ item: MenuItem }> = ({ item }) => {
@@ -15,15 +26,15 @@ const SidebarGrandchildItem: React.FC<{ item: MenuItem }> = ({ item }) => {
     <Link
       href={item.href || '#'}
       className={`
-        flex items-center gap-2.5 w-full px-3 py-1.5 rounded-md text-[13px]
-        transition-all duration-150 ease-in-out
+        flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-[13px]
+        transition-all duration-200 ease-in-out
         ${isActive
-          ? 'bg-blue-50 text-blue-700 font-medium'
-          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/60'
+          ? 'bg-blue-600 text-white font-medium shadow-md'
+          : 'text-gray-500 hover:bg-blue-50 hover:text-blue-600'
         }
       `}
     >
-      {item.icon && <span className="shrink-0 opacity-80">{item.icon}</span>}
+      {item.icon && <span className={`shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`}>{item.icon}</span>}
       <span>{item.label}</span>
     </Link>
   );
@@ -50,22 +61,22 @@ const SidebarChildItem: React.FC<SidebarChildItemProps> = ({ item, expandedItems
         <button
           onClick={() => onToggle(item.id)}
           className={`
-            flex items-center justify-between w-full px-3 py-2 rounded-md text-[13px]
-            transition-all duration-150 ease-in-out
+            flex items-center justify-between w-full px-3 py-2 rounded-lg text-[13px]
+            transition-all duration-200 ease-in-out
             ${shouldHighlight
-              ? 'bg-blue-50 text-blue-700 font-medium'
-              : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/60'
+              ? 'bg-blue-50 text-blue-600 font-medium'
+              : 'text-gray-500 hover:bg-blue-50 hover:text-blue-600'
             }
           `}
         >
           <div className="flex items-center gap-2.5">
-            {item.icon && <span className="shrink-0 opacity-80">{item.icon}</span>}
+            {item.icon && <span className={`shrink-0 ${shouldHighlight ? 'text-blue-500' : 'text-gray-400'}`}>{item.icon}</span>}
             <span>{item.label}</span>
           </div>
           <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`} />
         </button>
         <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-          <div className="ml-3 mt-0.5 space-y-0.5 border-l border-gray-200 pl-3">
+          <div className="ml-3 mt-0.5 space-y-0.5 border-l-2 border-gray-100 pl-3">
             {item.children?.map((child) => (
               <SidebarGrandchildItem key={child.id} item={child} />
             ))}
@@ -79,20 +90,20 @@ const SidebarChildItem: React.FC<SidebarChildItemProps> = ({ item, expandedItems
     <Link
       href={item.href || '#'}
       className={`
-        flex items-center gap-2.5 w-full px-3 py-2 rounded-md text-[13px]
-        transition-all duration-150 ease-in-out
+        flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px]
+        transition-all duration-200 ease-in-out
         ${isActive
-          ? 'bg-blue-50 text-blue-700 font-medium'
-          : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/60'
+          ? 'bg-blue-600 text-white font-medium shadow-md'
+          : 'text-gray-500 hover:bg-blue-50 hover:text-blue-600'
         }
       `}
     >
-      {item.icon && <span className="shrink-0 opacity-80">{item.icon}</span>}
+      {item.icon && <span className={`shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`}>{item.icon}</span>}
       <span>{item.label}</span>
       {item.badge && (
-        <span className={`ml-auto px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
+        <span className={`ml-auto px-2 py-0.5 text-xs font-semibold rounded-full ${
           /^\d+$/.test(item.badge)
-            ? 'bg-red-500 text-white min-w-4.5 text-center'
+            ? 'bg-red-500 text-white min-w-5 text-center'
             : 'bg-amber-100 text-amber-700'
         }`}>
           {item.badge}
@@ -130,16 +141,15 @@ const SidebarMenuItem: React.FC<SidebarMenuItemProps> = ({
     const content = (
       <div
         className={`
-          relative flex items-center justify-center w-10 h-10 mx-auto rounded-lg
-          transition-all duration-150
+          relative flex items-center justify-center w-10 h-10 mx-auto rounded-xl
+          transition-all duration-200
           ${item.isDisabled
             ? 'text-gray-300 cursor-not-allowed'
             : shouldHighlight
-              ? 'bg-blue-100 text-blue-700 shadow-sm'
-              : 'text-gray-500 hover:bg-gray-200/70 hover:text-gray-700'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'text-gray-500 hover:bg-blue-50 hover:text-blue-600'
           }
         `}
-        title={item.label}
       >
         {item.icon && <span className="shrink-0">{item.icon}</span>}
         {item.badge && /^\d+$/.test(item.badge) && (
@@ -151,18 +161,18 @@ const SidebarMenuItem: React.FC<SidebarMenuItemProps> = ({
     );
 
     if (item.isDisabled) return <div className="mb-1">{content}</div>;
-    if (item.href) return <div className="mb-1"><Link href={item.href}>{content}</Link></div>;
-    return <div className="mb-1"><button onClick={onToggle} className="w-full">{content}</button></div>;
+    if (item.href) return <div className="mb-1"><Tooltip label={item.label}><Link href={item.href}>{content}</Link></Tooltip></div>;
+    return <div className="mb-1"><Tooltip label={item.label}><button onClick={onToggle} className="w-full">{content}</button></Tooltip></div>;
   }
 
   // ── Disabled ──
   if (item.isDisabled) {
     return (
-      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 cursor-not-allowed text-sm">
+      <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 cursor-not-allowed text-sm">
         {item.icon && <span className="shrink-0">{item.icon}</span>}
         <span>{item.label}</span>
         {item.badge && (
-          <span className="ml-auto px-2 py-0.5 text-[10px] font-medium rounded-full bg-gray-100 text-gray-400">
+          <span className="ml-auto px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-400">
             {item.badge}
           </span>
         )}
@@ -177,33 +187,39 @@ const SidebarMenuItem: React.FC<SidebarMenuItemProps> = ({
         <button
           onClick={onToggle}
           className={`
-            flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm
-            transition-all duration-150 ease-in-out group
+            flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm
+            transition-all duration-200 ease-in-out group
             ${shouldHighlight
-              ? 'bg-blue-50 text-blue-700 font-semibold border-l-3 border-blue-600 pl-2.25'
-              : 'text-gray-700 hover:bg-gray-100/80 hover:text-gray-900'
+              ? 'bg-blue-600 text-white font-semibold shadow-md'
+              : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:translate-x-1'
             }
           `}
         >
           <div className="flex items-center gap-3">
-            {item.icon && <span className={`shrink-0 transition-colors duration-150 ${shouldHighlight ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`}>{item.icon}</span>}
+            {item.icon && (
+              <span className={`shrink-0 transition-all duration-200 group-hover:scale-110 ${shouldHighlight ? 'text-white' : 'text-gray-500 group-hover:text-blue-600'}`}>
+                {item.icon}
+              </span>
+            )}
             <span>{item.label}</span>
           </div>
           <div className="flex items-center gap-1.5">
             {item.badge && (
-              <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
-                /^\d+$/.test(item.badge)
-                  ? 'bg-red-500 text-white min-w-4.5 text-center'
-                  : 'bg-amber-100 text-amber-700'
+              <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                shouldHighlight
+                  ? 'bg-white/20 text-white'
+                  : /^\d+$/.test(item.badge)
+                    ? 'bg-red-500 text-white min-w-5 text-center'
+                    : 'bg-amber-100 text-amber-700'
               }`}>
                 {item.badge}
               </span>
             )}
-            <ChevronDownIcon className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`} />
+            <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${shouldHighlight ? 'text-white/70' : 'text-gray-400'} ${isExpanded ? '' : '-rotate-90'}`} />
           </div>
         </button>
         <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? 'max-h-125 opacity-100' : 'max-h-0 opacity-0'}`}>
-          <div className="ml-4 mt-1 space-y-0.5 border-l border-gray-200 pl-3">
+          <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-gray-100 pl-3">
             {item.children?.map((child) => (
               <SidebarChildItem key={child.id} item={child} expandedItems={expandedItems} onToggle={onToggleChild} />
             ))}
@@ -218,23 +234,29 @@ const SidebarMenuItem: React.FC<SidebarMenuItemProps> = ({
     <Link
       href={item.href || '#'}
       className={`
-        flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm
-        transition-all duration-150 ease-in-out group
+        flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm
+        transition-all duration-200 ease-in-out group
         ${isActive
-          ? 'bg-blue-50 text-blue-700 font-semibold border-l-3 border-blue-600 pl-2.25'
-          : 'text-gray-700 hover:bg-gray-100/80 hover:text-gray-900'
+          ? 'bg-blue-600 text-white font-semibold shadow-md'
+          : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:translate-x-1'
         }
       `}
     >
       <div className="flex items-center gap-3">
-        {item.icon && <span className={`shrink-0 transition-colors duration-150 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`}>{item.icon}</span>}
+        {item.icon && (
+          <span className={`shrink-0 transition-all duration-200 group-hover:scale-110 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-blue-600'}`}>
+            {item.icon}
+          </span>
+        )}
         <span>{item.label}</span>
       </div>
       {item.badge && (
-        <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
-          /^\d+$/.test(item.badge)
-            ? 'bg-red-500 text-white min-w-4.5 text-center'
-            : 'bg-amber-100 text-amber-700'
+        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+          isActive
+            ? 'bg-white/20 text-white'
+            : /^\d+$/.test(item.badge)
+              ? 'bg-red-500 text-white min-w-5 text-center'
+              : 'bg-amber-100 text-amber-700'
         }`}>
           {item.badge}
         </span>
@@ -296,20 +318,20 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({ items, groups, isColla
   // ── Grouped rendering ──
   if (groups) {
     return (
-      <nav className="space-y-5">
+      <nav className="space-y-6">
         {groups.map((group, idx) => (
           <div key={idx}>
             {!isCollapsed && (
-              <div className="px-3 mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              <div className="px-4 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                   {group.title}
                 </span>
               </div>
             )}
             {isCollapsed && idx > 0 && (
-              <div className="mx-3 mb-2 border-t border-gray-200" />
+              <div className="mx-3 mb-2 border-t border-gray-100" />
             )}
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {group.items.map(renderItem)}
             </div>
           </div>
@@ -320,7 +342,7 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({ items, groups, isColla
 
   // ── Flat rendering (backward compat) ──
   return (
-    <nav className="space-y-0.5">
+    <nav className="space-y-1">
       {(items || []).map(renderItem)}
     </nav>
   );

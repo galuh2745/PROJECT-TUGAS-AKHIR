@@ -50,10 +50,10 @@ export async function GET(req: Request) {
     if (tanggal_dari || tanggal_sampai) {
       whereClause.tanggal = {};
       if (tanggal_dari) {
-        whereClause.tanggal.gte = new Date(tanggal_dari);
+        whereClause.tanggal.gte = new Date(`${tanggal_dari}T00:00:00.000Z`);
       }
       if (tanggal_sampai) {
-        whereClause.tanggal.lte = new Date(tanggal_sampai);
+        whereClause.tanggal.lte = new Date(`${tanggal_sampai}T23:59:59.999Z`);
       }
     }
 
@@ -114,17 +114,25 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { tanggal, nama_customer, pengeluaran, keterangan, details } = body;
+    const { tanggal, nama_customer, customer_id, pengeluaran, keterangan, details, jumlah_bayar, metode_pembayaran } = body;
 
     // Validations
     if (!tanggal) {
       return NextResponse.json({ success: false, error: 'Tanggal wajib diisi' }, { status: 400 });
     }
-    if (!nama_customer || nama_customer.trim() === '') {
-      return NextResponse.json({ success: false, error: 'Nama customer wajib diisi' }, { status: 400 });
+    if (!customer_id) {
+      return NextResponse.json({ success: false, error: 'Customer wajib dipilih' }, { status: 400 });
     }
     if (!details || !Array.isArray(details) || details.length === 0) {
       return NextResponse.json({ success: false, error: 'Minimal 1 item detail wajib diisi' }, { status: 400 });
+    }
+
+    // Validate customer exists
+    const customer = await prisma.customer.findUnique({
+      where: { id: BigInt(customer_id) }
+    });
+    if (!customer) {
+      return NextResponse.json({ success: false, error: 'Customer tidak ditemukan' }, { status: 404 });
     }
 
     // Validate each detail item
@@ -155,13 +163,25 @@ export async function POST(req: Request) {
     });
 
     const saldo = totalPenjualan - (pengeluaran || 0);
+    const namaCustomer = nama_customer?.trim() || customer.nama;
+    const bayar = jumlah_bayar !== undefined && jumlah_bayar !== null ? parseFloat(jumlah_bayar) : totalPenjualan;
+    const sisaPiutang = totalPenjualan - bayar;
+    const metodePembayaran = metode_pembayaran || 'CASH';
 
-    // Create header with details in transaction
+    // Validasi jumlah bayar
+    if (bayar < 0) {
+      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh negatif' }, { status: 400 });
+    }
+    if (bayar > totalPenjualan) {
+      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh melebihi total penjualan' }, { status: 400 });
+    }
+
+    // Create header with details + penjualan in transaction
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const header = await tx.barangKeluarDaging.create({
         data: {
           tanggal: new Date(tanggal),
-          nama_customer: nama_customer.trim(),
+          nama_customer: namaCustomer,
           total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
           pengeluaran: new Decimal((pengeluaran || 0).toFixed(2)),
           saldo: new Decimal(saldo.toFixed(2)),
@@ -174,6 +194,20 @@ export async function POST(req: Request) {
           details: {
             include: { jenis_daging: { select: { id: true, nama_jenis: true } } },
           },
+        },
+      });
+
+      // Create Penjualan record (financial layer)
+      await tx.penjualan.create({
+        data: {
+          customer_id: BigInt(customer_id),
+          tanggal: new Date(tanggal),
+          jenis_transaksi: 'DAGING',
+          total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
+          jumlah_bayar: new Decimal(bayar.toFixed(2)),
+          sisa_piutang: new Decimal(sisaPiutang.toFixed(2)),
+          metode_pembayaran: metodePembayaran,
+          keterangan: `Barang Keluar Daging #${header.id} - ${namaCustomer}`,
         },
       });
 
@@ -190,6 +224,8 @@ export async function POST(req: Request) {
         total_penjualan: parseFloat(result.total_penjualan.toString()),
         pengeluaran: parseFloat(result.pengeluaran.toString()),
         saldo: parseFloat(result.saldo.toString()),
+        jumlah_bayar: bayar,
+        sisa_piutang: sisaPiutang,
         detail_count: result.details.length,
       },
     });
@@ -208,7 +244,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { id, tanggal, nama_customer, pengeluaran, keterangan, details } = body;
+    const { id, tanggal, nama_customer, customer_id, pengeluaran, keterangan, details, jumlah_bayar, metode_pembayaran } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID wajib diisi' }, { status: 400 });
@@ -227,11 +263,19 @@ export async function PUT(req: Request) {
     if (!tanggal) {
       return NextResponse.json({ success: false, error: 'Tanggal wajib diisi' }, { status: 400 });
     }
-    if (!nama_customer || nama_customer.trim() === '') {
-      return NextResponse.json({ success: false, error: 'Nama customer wajib diisi' }, { status: 400 });
+    if (!customer_id) {
+      return NextResponse.json({ success: false, error: 'Customer wajib dipilih' }, { status: 400 });
     }
     if (!details || !Array.isArray(details) || details.length === 0) {
       return NextResponse.json({ success: false, error: 'Minimal 1 item detail wajib diisi' }, { status: 400 });
+    }
+
+    // Validate customer exists
+    const customer = await prisma.customer.findUnique({
+      where: { id: BigInt(customer_id) }
+    });
+    if (!customer) {
+      return NextResponse.json({ success: false, error: 'Customer tidak ditemukan' }, { status: 404 });
     }
 
     // Validate each detail item
@@ -262,8 +306,20 @@ export async function PUT(req: Request) {
     });
 
     const saldo = totalPenjualan - (pengeluaran || 0);
+    const namaCustomer = nama_customer?.trim() || customer.nama;
+    const bayar = jumlah_bayar !== undefined && jumlah_bayar !== null ? parseFloat(jumlah_bayar) : totalPenjualan;
+    const sisaPiutang = totalPenjualan - bayar;
+    const metodePembayaran = metode_pembayaran || 'CASH';
 
-    // Update header and replace details in transaction
+    // Validasi jumlah bayar
+    if (bayar < 0) {
+      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh negatif' }, { status: 400 });
+    }
+    if (bayar > totalPenjualan) {
+      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh melebihi total penjualan' }, { status: 400 });
+    }
+
+    // Update header, replace details, and update/create penjualan in transaction
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Delete existing details
       await tx.barangKeluarDagingDetail.deleteMany({
@@ -275,7 +331,7 @@ export async function PUT(req: Request) {
         where: { id: BigInt(id) },
         data: {
           tanggal: new Date(tanggal),
-          nama_customer: nama_customer.trim(),
+          nama_customer: namaCustomer,
           total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
           pengeluaran: new Decimal((pengeluaran || 0).toFixed(2)),
           saldo: new Decimal(saldo.toFixed(2)),
@@ -291,6 +347,42 @@ export async function PUT(req: Request) {
         },
       });
 
+      // Find linked penjualan by keterangan pattern
+      const linkedPenjualan = await tx.penjualan.findFirst({
+        where: {
+          keterangan: { contains: `Barang Keluar Daging #${id}` },
+          jenis_transaksi: 'DAGING',
+        }
+      });
+
+      if (linkedPenjualan) {
+        await tx.penjualan.update({
+          where: { id: linkedPenjualan.id },
+          data: {
+            customer_id: BigInt(customer_id),
+            tanggal: new Date(tanggal),
+            total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
+            jumlah_bayar: new Decimal(bayar.toFixed(2)),
+            sisa_piutang: new Decimal(sisaPiutang.toFixed(2)),
+            metode_pembayaran: metodePembayaran,
+            keterangan: `Barang Keluar Daging #${id} - ${namaCustomer}`,
+          },
+        });
+      } else {
+        await tx.penjualan.create({
+          data: {
+            customer_id: BigInt(customer_id),
+            tanggal: new Date(tanggal),
+            jenis_transaksi: 'DAGING',
+            total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
+            jumlah_bayar: new Decimal(bayar.toFixed(2)),
+            sisa_piutang: new Decimal(sisaPiutang.toFixed(2)),
+            metode_pembayaran: metodePembayaran,
+            keterangan: `Barang Keluar Daging #${id} - ${namaCustomer}`,
+          },
+        });
+      }
+
       return header;
     });
 
@@ -304,6 +396,8 @@ export async function PUT(req: Request) {
         total_penjualan: parseFloat(result.total_penjualan.toString()),
         pengeluaran: parseFloat(result.pengeluaran.toString()),
         saldo: parseFloat(result.saldo.toString()),
+        jumlah_bayar: bayar,
+        sisa_piutang: sisaPiutang,
         detail_count: result.details.length,
       },
     });
@@ -337,9 +431,22 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, error: 'Data tidak ditemukan' }, { status: 404 });
     }
 
-    // Delete (cascade deletes details)
-    await prisma.barangKeluarDaging.delete({
-      where: { id: BigInt(id) },
+    // Delete (cascade deletes details) + linked penjualan
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Delete linked penjualan record
+      const linkedPenjualan = await tx.penjualan.findFirst({
+        where: {
+          keterangan: { contains: `Barang Keluar Daging #${id}` },
+          jenis_transaksi: 'DAGING',
+        }
+      });
+      if (linkedPenjualan) {
+        await tx.penjualan.delete({ where: { id: linkedPenjualan.id } });
+      }
+
+      await tx.barangKeluarDaging.delete({
+        where: { id: BigInt(id) },
+      });
     });
 
     return NextResponse.json({

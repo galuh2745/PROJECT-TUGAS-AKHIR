@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
     // Cek apakah sudah ada absensi masuk & pulang di hari tersebut
     const tanggalLembur = new Date(tanggal);
-    tanggalLembur.setHours(0, 0, 0, 0);
+    tanggalLembur.setUTCHours(0, 0, 0, 0);
 
     const absensi = await prisma.absensi.findFirst({
       where: {

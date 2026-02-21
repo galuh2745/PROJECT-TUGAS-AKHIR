@@ -47,10 +47,10 @@ export async function GET(req: Request) {
     if (tanggal_dari || tanggal_sampai) {
       whereClause.tanggal_masuk = {};
       if (tanggal_dari) {
-        whereClause.tanggal_masuk.gte = new Date(tanggal_dari);
+        whereClause.tanggal_masuk.gte = new Date(`${tanggal_dari}T00:00:00.000Z`);
       }
       if (tanggal_sampai) {
-        whereClause.tanggal_masuk.lte = new Date(tanggal_sampai);
+        whereClause.tanggal_masuk.lte = new Date(`${tanggal_sampai}T23:59:59.999Z`);
       }
     }
 

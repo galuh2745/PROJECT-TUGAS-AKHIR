@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
             nama: true,
             no_hp: true,
             alamat: true,
+            foto_profil: true,
             status: true,
             jenis_karyawan: {
               select: {
@@ -94,6 +95,7 @@ export async function GET(request: NextRequest) {
             nama: user.karyawan.nama,
             no_hp: user.karyawan.no_hp,
             alamat: user.karyawan.alamat,
+            foto_profil: user.karyawan.foto_profil,
             status: user.karyawan.status,
             jenis_karyawan: user.karyawan.jenis_karyawan ? {
               id: user.karyawan.jenis_karyawan.id.toString(),

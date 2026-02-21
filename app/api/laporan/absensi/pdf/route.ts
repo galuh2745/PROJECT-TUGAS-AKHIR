@@ -31,9 +31,11 @@ export async function GET(req: Request) {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
     
     let role: string;
+    let userName: string = 'Admin';
     try {
       const { payload } = await jwtVerify(token, secret);
-      role = (payload as { role: string }).role;
+      role = (payload as { role: string; name?: string }).role;
+      userName = (payload as { name?: string }).name || 'Admin';
     } catch {
       return new NextResponse('Token tidak valid', { status: 401 });
     }
@@ -68,8 +70,8 @@ export async function GET(req: Request) {
     // =============================================
     // 3. HITUNG RANGE TANGGAL
     // =============================================
-    const tanggalAwal = new Date(tahun, bulan - 1, 1);
-    const tanggalAkhir = new Date(tahun, bulan, 0, 23, 59, 59, 999);
+    const tanggalAwal = new Date(Date.UTC(tahun, bulan - 1, 1));
+    const tanggalAkhir = new Date(Date.UTC(tahun, bulan, 0, 23, 59, 59, 999));
 
     const namaBulan = [
       'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -151,24 +153,46 @@ export async function GET(req: Request) {
       format: 'a4',
     });
 
-    // Header
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // === WATERMARK ===
+    doc.setFontSize(50);
+    doc.setTextColor(200, 200, 200);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CV ASWI SENTOSA LAMPUNG', pageWidth / 2, pageHeight / 2, {
+      align: 'center',
+      angle: 45,
+    });
+    doc.setTextColor(0, 0, 0);
+
+    // === HEADER ===
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('CV ASWI SENTOSA', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text('LAPORAN ABSENSI BULANAN', doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
+    doc.text('CV ASWI SENTOSA LAMPUNG', pageWidth / 2, 20, { align: 'center' });
     
     doc.setFontSize(10);
-    doc.text(`Periode: ${namaBulan[bulan - 1]} ${tahun}`, doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text('Jl mufakat wawai, Yukum Jaya, lingkungan VB, Kabupaten Lampung Tengah, Lampung', pageWidth / 2, 26, { align: 'center' });
+
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.line(14, 30, pageWidth - 14, 30);
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LAPORAN ABSENSI BULANAN', pageWidth / 2, 38, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Periode: ${namaBulan[bulan - 1]} ${tahun}`, pageWidth / 2, 44, { align: 'center' });
 
     // Jika tidak ada data
     if (rekapData.length === 0) {
       doc.setFontSize(12);
-      doc.text('Tidak ada data absensi untuk periode ini.', doc.internal.pageSize.getWidth() / 2, 60, { align: 'center' });
+      doc.text('Tidak ada data absensi untuk periode ini.', pageWidth / 2, 65, { align: 'center' });
       doc.setFontSize(10);
-      doc.text('Silakan pilih periode lain atau periksa data karyawan.', doc.internal.pageSize.getWidth() / 2, 70, { align: 'center' });
+      doc.text('Silakan pilih periode lain atau periksa data karyawan.', pageWidth / 2, 75, { align: 'center' });
     } else {
       // Siapkan data tabel
       const tableHeaders = ['No', 'NIP', 'Nama', 'Jenis', 'Hadir', 'Terlambat', 'Izin', 'Cuti', 'Alpha'];
@@ -209,7 +233,7 @@ export async function GET(req: Request) {
       autoTable(doc, {
         head: [tableHeaders],
         body: tableData,
-        startY: 45,
+        startY: 50,
         theme: 'grid',
         styles: {
           fontSize: 8,
@@ -243,15 +267,24 @@ export async function GET(req: Request) {
     }
 
     // Footer
-    const pageHeight = doc.internal.pageSize.getHeight();
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.text(
       `Dicetak pada: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
       14,
-      pageHeight - 15
+      pageHeight - 25
     );
-    doc.text('Sistem Absensi Karyawan - CV Aswi Sentosa', 14, pageHeight - 10);
+    doc.text('Mengetahui: Agus Tri Widodo', 14, pageHeight - 20);
+    doc.text(`Dicetak oleh: ${userName}`, 14, pageHeight - 15);
+    doc.text('Sistem Absensi Karyawan - CV Aswi Sentosa Lampung', 14, pageHeight - 10);
+
+    // Metadata
+    doc.setProperties({
+      title: `Laporan Absensi - ${namaBulan[bulan - 1]} ${tahun}`,
+      subject: 'Laporan Absensi Bulanan',
+      author: 'CV Aswi Sentosa Lampung',
+      creator: 'Sistem Absensi CV Aswi Sentosa',
+    });
 
     // =============================================
     // 7. RETURN PDF RESPONSE

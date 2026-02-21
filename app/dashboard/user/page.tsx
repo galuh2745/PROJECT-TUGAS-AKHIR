@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import {
-  LogIn, LogOut, CheckCircle2, Clock, CalendarCheck, AlertTriangle,
+  LogIn, LogOut, CheckCircle2, CalendarCheck, AlertTriangle,
   Loader2, RefreshCw, X, MapPin
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -315,7 +315,7 @@ export default function UserDashboard() {
       </FadeIn>
 
       {/* Ringkasan Cards */}
-      <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StaggerItem>
           <Card>
             <CardContent className="pt-5">
@@ -360,21 +360,6 @@ export default function UserDashboard() {
             </CardContent>
           </Card>
         </StaggerItem>
-
-        <StaggerItem>
-          <Card>
-            <CardContent className="flex items-center gap-4 pt-5">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Clock className="w-6 h-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Lembur Bulan Ini</p>
-                <p className="text-2xl font-bold">{data?.ringkasan.total_jam_lembur_bulan_ini}</p>
-                <p className="text-xs text-muted-foreground mt-1">Jam total</p>
-              </div>
-            </CardContent>
-          </Card>
-        </StaggerItem>
       </StaggerContainer>
 
       {/* Tabs Riwayat */}
@@ -385,7 +370,6 @@ export default function UserDashboard() {
               <TabsList>
                 <TabsTrigger value="absensi">Riwayat Absensi</TabsTrigger>
                 <TabsTrigger value="izin">Riwayat Izin & Cuti</TabsTrigger>
-                <TabsTrigger value="lembur">Riwayat Lembur</TabsTrigger>
               </TabsList>
             </CardHeader>
             <CardContent className="pt-4">
@@ -459,37 +443,7 @@ export default function UserDashboard() {
                 </Table>
               </TabsContent>
 
-              {/* Tab Lembur */}
-              <TabsContent value="lembur" className="m-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Jam Mulai</TableHead>
-                      <TableHead>Jam Selesai</TableHead>
-                      <TableHead>Total Jam</TableHead>
-                      <TableHead>Keterangan</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data?.riwayat.lembur.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Belum ada data lembur</TableCell>
-                      </TableRow>
-                    ) : (
-                      data?.riwayat.lembur.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{formatDate(item.tanggal)}</TableCell>
-                          <TableCell className="text-muted-foreground">{formatTime(item.jam_mulai)}</TableCell>
-                          <TableCell className="text-muted-foreground">{formatTime(item.jam_selesai)}</TableCell>
-                          <TableCell className="font-medium">{item.total_jam} jam</TableCell>
-                          <TableCell className="text-muted-foreground max-w-[200px] truncate">{item.keterangan}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </TabsContent>
+
             </CardContent>
           </Tabs>
         </Card>
