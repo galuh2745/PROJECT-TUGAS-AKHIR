@@ -58,6 +58,9 @@ export async function GET(req: Request) {
         customer: {
           select: { nama: true },
         },
+        penjualan: {
+          select: { nomor_nota: true },
+        },
       },
       orderBy: { tanggal: 'desc' },
     });
@@ -66,6 +69,8 @@ export async function GET(req: Request) {
       id: p.id.toString(),
       customer_id: p.customer_id.toString(),
       customer_nama: p.customer.nama,
+      penjualan_id: p.penjualan_id?.toString() || null,
+      nomor_nota: p.penjualan?.nomor_nota || null,
       tanggal: p.tanggal,
       jumlah_bayar: parseFloat(p.jumlah_bayar.toString()),
       metode: p.metode,
@@ -83,7 +88,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/pembayaran-piutang - Create pembayaran piutang (FIFO)
+// POST /api/pembayaran-piutang - Create pembayaran piutang (FIFO Rolling)
 export async function POST(req: Request) {
   try {
     const validation = await validateAdmin();
@@ -123,7 +128,7 @@ export async function POST(req: Request) {
         customer_id: BigInt(customer_id),
         sisa_piutang: { gt: 0 },
       },
-      orderBy: { tanggal: 'asc' }, // FIFO
+      orderBy: { tanggal: 'asc' }, // FIFO: hutang tertua dulu
     });
 
     const totalPiutang = outstandingPenjualan.reduce(
@@ -140,14 +145,61 @@ export async function POST(req: Request) {
 
     if (jumlah_bayar > totalPiutang) {
       return NextResponse.json(
-        { success: false, error: `Jumlah bayar melebihi total piutang (${totalPiutang})` },
+        {
+          success: false,
+          error: `Jumlah bayar (Rp ${jumlah_bayar.toLocaleString()}) melebihi total piutang (Rp ${totalPiutang.toLocaleString()})`,
+        },
         { status: 400 }
       );
     }
 
-    // Use transaction to ensure data consistency
+    // Use transaction to ensure data consistency (FIFO Rolling)
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create pembayaran record
+      // 1. FIFO: Kurangi hutang dari yang tertua
+      let remainingPayment = jumlah_bayar;
+      const updatedTransactions: { id: string; nomor_nota: string; dibayar: number; sisa: number; status: string }[] = [];
+
+      for (const penjualan of outstandingPenjualan) {
+        if (remainingPayment <= 0) break;
+
+        const currentPiutang = parseFloat(penjualan.sisa_piutang.toString());
+        const currentBayar = parseFloat(penjualan.jumlah_bayar.toString());
+        const grandTotal = parseFloat(penjualan.grand_total.toString());
+        const reduction = Math.min(remainingPayment, currentPiutang);
+        const newSisaPiutang = currentPiutang - reduction;
+        const newJumlahBayar = currentBayar + reduction;
+
+        // Determine new status
+        let newStatus: string;
+        if (newSisaPiutang <= 0) {
+          newStatus = 'lunas';
+        } else if (newJumlahBayar > 0) {
+          newStatus = 'sebagian';
+        } else {
+          newStatus = 'hutang';
+        }
+
+        await tx.penjualan.update({
+          where: { id: penjualan.id },
+          data: {
+            sisa_piutang: new Prisma.Decimal(Math.max(0, newSisaPiutang).toFixed(2)),
+            jumlah_bayar: new Prisma.Decimal(newJumlahBayar.toFixed(2)),
+            status: newStatus,
+          },
+        });
+
+        updatedTransactions.push({
+          id: penjualan.id.toString(),
+          nomor_nota: penjualan.nomor_nota,
+          dibayar: reduction,
+          sisa: Math.max(0, newSisaPiutang),
+          status: newStatus,
+        });
+
+        remainingPayment -= reduction;
+      }
+
+      // 2. Create pembayaran record
       const pembayaran = await tx.pembayaranPiutang.create({
         data: {
           customer_id: BigInt(customer_id),
@@ -161,27 +213,7 @@ export async function POST(req: Request) {
         },
       });
 
-      // 2. Reduce piutang FIFO
-      let remainingPayment = jumlah_bayar;
-
-      for (const penjualan of outstandingPenjualan) {
-        if (remainingPayment <= 0) break;
-
-        const currentPiutang = parseFloat(penjualan.sisa_piutang.toString());
-        const reduction = Math.min(remainingPayment, currentPiutang);
-        const newSisaPiutang = currentPiutang - reduction;
-
-        await tx.penjualan.update({
-          where: { id: penjualan.id },
-          data: {
-            sisa_piutang: new Prisma.Decimal(newSisaPiutang),
-          },
-        });
-
-        remainingPayment -= reduction;
-      }
-
-      return pembayaran;
+      return { pembayaran, updatedTransactions };
     });
 
     // Get updated total piutang
@@ -195,15 +227,18 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
+      message: `Pembayaran Rp ${jumlah_bayar.toLocaleString()} berhasil diproses (FIFO)`,
       data: {
-        id: result.id.toString(),
-        customer_id: result.customer_id.toString(),
-        customer_nama: result.customer.nama,
-        tanggal: result.tanggal,
-        jumlah_bayar: parseFloat(result.jumlah_bayar.toString()),
-        metode: result.metode,
-        keterangan: result.keterangan,
+        id: result.pembayaran.id.toString(),
+        customer_id: result.pembayaran.customer_id.toString(),
+        customer_nama: result.pembayaran.customer.nama,
+        tanggal: result.pembayaran.tanggal,
+        jumlah_bayar: parseFloat(result.pembayaran.jumlah_bayar.toString()),
+        metode: result.pembayaran.metode,
+        keterangan: result.pembayaran.keterangan,
+        piutang_sebelumnya: totalPiutang,
         sisa_piutang_total: parseFloat(updatedPiutang._sum.sisa_piutang?.toString() || '0'),
+        transaksi_terdampak: result.updatedTransactions,
       },
     });
   } catch (error) {

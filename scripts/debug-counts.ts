@@ -14,7 +14,8 @@ async function main() {
     { name: 'jenis_daging', fn: () => prisma.jenisDaging.count() },
     { name: 'customer', fn: () => prisma.customer.count() },
     { name: 'penjualan', fn: () => prisma.penjualan.count() },
-    { name: 'piutang', fn: () => prisma.piutang.count() },
+    { name: 'penjualan_detail', fn: () => prisma.penjualanDetail.count() },
+    { name: 'pembayaran_piutang', fn: () => prisma.pembayaranPiutang.count() },
     { name: 'barang_masuk', fn: () => prisma.barangMasuk.count() },
     { name: 'barang_keluar_ayam_hidup', fn: () => prisma.barangKeluarAyamHidup.count() },
     { name: 'barang_keluar_daging', fn: () => prisma.barangKeluarDaging.count() },
@@ -50,12 +51,12 @@ async function main() {
 
   // Show barang masuk dates
   const bm = await prisma.barangMasuk.findMany({
-    select: { id: true, tanggal: true },
-    orderBy: { tanggal: 'desc' },
+    select: { id: true, tanggal_masuk: true },
+    orderBy: { tanggal_masuk: 'desc' },
     take: 5
   });
   console.log('\n=== Barang Masuk sample ===');
-  bm.forEach(b => console.log('id:', b.id.toString(), 'tanggal:', b.tanggal));
+  bm.forEach(b => console.log('id:', b.id.toString(), 'tanggal:', b.tanggal_masuk));
 
   await prisma.$disconnect();
 }

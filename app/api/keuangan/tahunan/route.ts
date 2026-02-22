@@ -45,17 +45,20 @@ export async function GET(req: Request) {
     const endDate = new Date(year + 1, 0, 1);
 
     // ==================== TOTAL TAHUNAN ====================
-    // Revenue ONLY from Penjualan (linked to BarangKeluar) + PembayaranPiutang
 
-    const [penjualanDagingTahunan, penjualanAyamHidupTahunan, pembayaranPiutangTahunan, beliAyam, pengeluaranDaging, pengeluaranAyamHidup] =
+    const [penjualanDagingTahunan, penjualanAyamHidupTahunan, penjualanAllTahunan, pembayaranPiutangTahunan, beliAyam, pengeluaranDaging, pengeluaranAyamHidup] =
       await Promise.all([
         prisma.penjualan.aggregate({
           where: { tanggal: { gte: startDate, lt: endDate }, jenis_transaksi: 'DAGING' },
-          _sum: { jumlah_bayar: true },
+          _sum: { jumlah_bayar: true, grand_total: true },
         }),
         prisma.penjualan.aggregate({
           where: { tanggal: { gte: startDate, lt: endDate }, jenis_transaksi: 'AYAM_HIDUP' },
-          _sum: { jumlah_bayar: true },
+          _sum: { jumlah_bayar: true, grand_total: true },
+        }),
+        prisma.penjualan.aggregate({
+          where: { tanggal: { gte: startDate, lt: endDate } },
+          _sum: { grand_total: true, sisa_piutang: true },
         }),
         prisma.pembayaranPiutang.aggregate({
           where: { tanggal: { gte: startDate, lt: endDate } },
@@ -75,7 +78,7 @@ export async function GET(req: Request) {
         }),
       ]);
 
-    // Ayam Mati TIDAK BISA CLAIM seluruh tahun
+    // Ayam Mati TIDAK BISA CLAIM
     const ayamMatiTidakBisaClaim = await prisma.ayamMati.findMany({
       where: {
         tanggal: { gte: startDate, lt: endDate },
@@ -107,14 +110,13 @@ export async function GET(req: Request) {
     const totalPenjualanAyamHidup = parseFloat(penjualanAyamHidupTahunan._sum.jumlah_bayar?.toString() || '0');
     const totalPelunasan = parseFloat(pembayaranPiutangTahunan._sum.jumlah_bayar?.toString() || '0');
     const totalPemasukan = totalPenjualanDaging + totalPenjualanAyamHidup + totalPelunasan;
+    const totalPenjualanTahunan = parseFloat(penjualanAllTahunan._sum.grand_total?.toString() || '0');
+    const piutangBaruTahunan = parseFloat(penjualanAllTahunan._sum.sisa_piutang?.toString() || '0');
 
     const totalBeliAyam = parseFloat(beliAyam._sum.total_harga?.toString() || '0');
     const totalPengeluaranDaging = parseFloat(pengeluaranDaging._sum.pengeluaran?.toString() || '0');
     const totalPengeluaranAyamHidup = parseFloat(pengeluaranAyamHidup._sum.pengeluaran?.toString() || '0');
-
-    const totalPengeluaran =
-      totalBeliAyam + totalPengeluaranDaging + totalPengeluaranAyamHidup + totalKerugianAyamMati;
-
+    const totalPengeluaran = totalBeliAyam + totalPengeluaranDaging + totalPengeluaranAyamHidup + totalKerugianAyamMati;
     const saldoTahunan = totalPemasukan - totalPengeluaran;
 
     // ==================== REKAP BULANAN ====================
@@ -122,7 +124,6 @@ export async function GET(req: Request) {
     const currentDate = new Date();
 
     for (let m = 1; m <= 12; m++) {
-      // Only process up to current month if current year
       if (year === currentDate.getFullYear() && m > currentDate.getMonth() + 1) break;
 
       const monthStart = new Date(year, m - 1, 1);
@@ -194,6 +195,12 @@ export async function GET(req: Request) {
       });
     }
 
+    // Total piutang aktif
+    const totalPiutangAktif = await prisma.penjualan.aggregate({
+      where: { sisa_piutang: { gt: 0 } },
+      _sum: { sisa_piutang: true },
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -204,6 +211,7 @@ export async function GET(req: Request) {
           kas_masuk_pelunasan: totalPelunasan,
           total: totalPemasukan,
         },
+        total_penjualan_tahunan: totalPenjualanTahunan,
         pengeluaran: {
           beli_ayam: totalBeliAyam,
           operasional_daging: totalPengeluaranDaging,
@@ -212,6 +220,11 @@ export async function GET(req: Request) {
           total: totalPengeluaran,
         },
         saldo_tahunan: saldoTahunan,
+        piutang: {
+          piutang_baru: piutangBaruTahunan,
+          pelunasan: totalPelunasan,
+          total_piutang_aktif: parseFloat(totalPiutangAktif._sum.sisa_piutang?.toString() || '0'),
+        },
         rekap_bulanan: rekapBulanan,
       },
     });

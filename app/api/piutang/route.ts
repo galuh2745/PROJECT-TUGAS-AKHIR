@@ -22,7 +22,7 @@ async function validateAdmin() {
   return { role };
 }
 
-// GET /api/piutang - Summary piutang
+// GET /api/piutang - Summary piutang with FIFO detail
 export async function GET(req: Request) {
   try {
     const validation = await validateAdmin();
@@ -33,30 +33,43 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const dateParam = searchParams.get('date');
 
-    // Total piutang aktif (all time)
+    // Total piutang aktif (all time) - sum sisa_piutang where status != lunas
     const totalPiutangAktif = await prisma.penjualan.aggregate({
       where: { sisa_piutang: { gt: 0 } },
       _sum: { sisa_piutang: true },
+      _count: true,
     });
 
-    // Get per-customer piutang breakdown
+    // Get per-customer piutang breakdown with FIFO order
     const customersWithPiutang = await prisma.customer.findMany({
       include: {
         penjualan: {
           where: { sisa_piutang: { gt: 0 } },
-          orderBy: { tanggal: 'asc' },
+          orderBy: { tanggal: 'asc' }, // FIFO: tertua dulu
+          select: {
+            id: true,
+            nomor_nota: true,
+            tanggal: true,
+            jenis_transaksi: true,
+            total_penjualan: true,
+            grand_total: true,
+            jumlah_bayar: true,
+            sisa_piutang: true,
+            status: true,
+            keterangan: true,
+          },
         },
       },
     });
 
     const customerPiutang = customersWithPiutang
       .map((c) => {
-        const total = c.penjualan.reduce(
+        const totalPiutang = c.penjualan.reduce(
           (sum, p) => sum + parseFloat(p.sisa_piutang.toString()),
           0
         );
         const totalPenjualan = c.penjualan.reduce(
-          (sum, p) => sum + parseFloat(p.total_penjualan.toString()),
+          (sum, p) => sum + parseFloat(p.grand_total.toString()),
           0
         );
         const totalDibayar = c.penjualan.reduce(
@@ -67,11 +80,23 @@ export async function GET(req: Request) {
           customer_id: c.id.toString(),
           customer_nama: c.nama,
           no_hp: c.no_hp,
-          total_piutang: total,
+          total_piutang: totalPiutang,
           total_penjualan: totalPenjualan,
           total_dibayar: totalDibayar,
           jumlah_transaksi: c.penjualan.length,
           transaksi_tertua: c.penjualan.length > 0 ? c.penjualan[0].tanggal : null,
+          // Detail transaksi FIFO (tertua → terbaru)
+          transaksi: c.penjualan.map((p) => ({
+            id: p.id.toString(),
+            nomor_nota: p.nomor_nota,
+            tanggal: p.tanggal,
+            jenis_transaksi: p.jenis_transaksi,
+            grand_total: parseFloat(p.grand_total.toString()),
+            jumlah_bayar: parseFloat(p.jumlah_bayar.toString()),
+            sisa_piutang: parseFloat(p.sisa_piutang.toString()),
+            status: p.status,
+            keterangan: p.keterangan,
+          })),
         };
       })
       .filter((c) => c.total_piutang > 0)
@@ -105,13 +130,26 @@ export async function GET(req: Request) {
       pelunasanHariIni = parseFloat(pelunasan._sum.jumlah_bayar?.toString() || '0');
     }
 
+    // Count by status
+    const [countHutang, countSebagian, countLunas] = await Promise.all([
+      prisma.penjualan.count({ where: { status: 'hutang' } }),
+      prisma.penjualan.count({ where: { status: 'sebagian' } }),
+      prisma.penjualan.count({ where: { status: 'lunas' } }),
+    ]);
+
     return NextResponse.json({
       success: true,
       data: {
         total_piutang_aktif: parseFloat(totalPiutangAktif._sum.sisa_piutang?.toString() || '0'),
+        jumlah_transaksi_aktif: totalPiutangAktif._count,
         piutang_hari_ini: piutangHariIni,
         pelunasan_hari_ini: pelunasanHariIni,
         jumlah_customer_hutang: customerPiutang.length,
+        ringkasan_status: {
+          hutang: countHutang,
+          sebagian: countSebagian,
+          lunas: countLunas,
+        },
         detail_per_customer: customerPiutang,
       },
     });

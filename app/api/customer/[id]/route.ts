@@ -38,9 +38,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       include: {
         penjualan: {
           orderBy: { tanggal: 'desc' },
+          include: { detail: true },
         },
         pembayaran: {
           orderBy: { tanggal: 'desc' },
+          include: {
+            penjualan: {
+              select: { nomor_nota: true },
+            },
+          },
         },
       },
     });
@@ -57,6 +63,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       0
     );
 
+    const totalTransaksi = customer.penjualan.length;
+    const transaksiLunas = customer.penjualan.filter((p) => p.status === 'lunas').length;
+    const transaksiBelumLunas = customer.penjualan.filter((p) => p.status !== 'lunas').length;
+
     return NextResponse.json({
       success: true,
       data: {
@@ -66,19 +76,41 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         alamat: customer.alamat,
         created_at: customer.created_at,
         total_piutang: totalPiutang,
+        ringkasan: {
+          total_transaksi: totalTransaksi,
+          transaksi_lunas: transaksiLunas,
+          transaksi_belum_lunas: transaksiBelumLunas,
+        },
         penjualan: customer.penjualan.map((p) => ({
-          ...p,
           id: p.id.toString(),
+          nomor_nota: p.nomor_nota,
           customer_id: p.customer_id.toString(),
+          tanggal: p.tanggal,
+          jenis_transaksi: p.jenis_transaksi,
+          keterangan: p.keterangan,
           total_penjualan: parseFloat(p.total_penjualan.toString()),
+          pengeluaran: parseFloat(p.pengeluaran.toString()),
+          grand_total: parseFloat(p.grand_total.toString()),
           jumlah_bayar: parseFloat(p.jumlah_bayar.toString()),
           sisa_piutang: parseFloat(p.sisa_piutang.toString()),
+          status: p.status,
+          detail: p.detail.map((d) => ({
+            id: d.id.toString(),
+            jenis_daging: d.jenis_daging,
+            ekor: d.ekor,
+            berat: parseFloat(d.berat.toString()),
+            harga: parseFloat(d.harga.toString()),
+            subtotal: parseFloat(d.subtotal.toString()),
+          })),
         })),
         pembayaran: customer.pembayaran.map((p) => ({
-          ...p,
           id: p.id.toString(),
           customer_id: p.customer_id.toString(),
+          tanggal: p.tanggal,
           jumlah_bayar: parseFloat(p.jumlah_bayar.toString()),
+          keterangan: p.keterangan,
+          nomor_nota_terkait: p.penjualan?.nomor_nota || null,
+          penjualan_id: p.penjualan_id?.toString() || null,
         })),
       },
     });

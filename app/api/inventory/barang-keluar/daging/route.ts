@@ -32,6 +32,34 @@ async function validateAdmin() {
   return { role };
 }
 
+// Helper: Generate nomor nota unik NOTA-YYYYMMDD-XXXX
+async function generateNomorNota(tanggal: Date, tx: Prisma.TransactionClient): Promise<string> {
+  const dateStr = tanggal.toISOString().split('T')[0].replace(/-/g, '');
+  const prefix = `NOTA-${dateStr}-`;
+
+  const lastNota = await tx.penjualan.findFirst({
+    where: { nomor_nota: { startsWith: prefix } },
+    orderBy: { nomor_nota: 'desc' },
+    select: { nomor_nota: true },
+  });
+
+  let nextNumber = 1;
+  if (lastNota) {
+    const lastNum = parseInt(lastNota.nomor_nota.replace(prefix, ''));
+    if (!isNaN(lastNum)) nextNumber = lastNum + 1;
+  }
+
+  return `${prefix}${String(nextNumber).padStart(4, '0')}`;
+}
+
+// Helper: Compute status
+function computeStatus(grandTotal: number, jumlahBayar: number): string {
+  const sisa = grandTotal - jumlahBayar;
+  if (sisa <= 0) return 'lunas';
+  if (jumlahBayar > 0) return 'sebagian';
+  return 'hutang';
+}
+
 // GET - Fetch all barang keluar daging with details
 export async function GET(req: Request) {
   try {
@@ -76,26 +104,50 @@ export async function GET(req: Request) {
       orderBy: { tanggal: 'desc' },
     });
 
-    const formattedData = barangKeluar.map((bk) => ({
-      id: bk.id.toString(),
-      tanggal: bk.tanggal.toISOString().split('T')[0],
-      nama_customer: bk.nama_customer,
-      total_penjualan: parseFloat(bk.total_penjualan.toString()),
-      pengeluaran: parseFloat(bk.pengeluaran.toString()),
-      saldo: parseFloat(bk.saldo.toString()),
-      keterangan: bk.keterangan,
-      created_at: bk.created_at.toISOString(),
-      details: bk.details.map((d) => ({
-        id: d.id.toString(),
-        jenis_daging_id: d.jenis_daging_id.toString(),
-        jenis_daging: {
-          id: d.jenis_daging.id.toString(),
-          nama_jenis: d.jenis_daging.nama_jenis,
+    const formattedData = await Promise.all(barangKeluar.map(async (bk) => {
+      // Find linked penjualan for piutang info
+      const linkedPenjualan = await prisma.penjualan.findFirst({
+        where: {
+          keterangan: { contains: `Barang Keluar Daging #${bk.id}` },
+          jenis_transaksi: 'DAGING',
         },
-        berat_kg: parseFloat(d.berat_kg.toString()),
-        harga_per_kg: parseFloat(d.harga_per_kg.toString()),
-        subtotal: parseFloat(d.subtotal.toString()),
-      })),
+        select: {
+          id: true,
+          nomor_nota: true,
+          jumlah_bayar: true,
+          sisa_piutang: true,
+          grand_total: true,
+          status: true,
+        },
+      });
+
+      return {
+        id: bk.id.toString(),
+        tanggal: bk.tanggal.toISOString().split('T')[0],
+        nama_customer: bk.nama_customer,
+        total_penjualan: parseFloat(bk.total_penjualan.toString()),
+        pengeluaran: parseFloat(bk.pengeluaran.toString()),
+        saldo: parseFloat(bk.saldo.toString()),
+        keterangan: bk.keterangan,
+        // Piutang info from linked penjualan
+        nomor_nota: linkedPenjualan?.nomor_nota || null,
+        jumlah_bayar: linkedPenjualan ? parseFloat(linkedPenjualan.jumlah_bayar.toString()) : parseFloat(bk.total_penjualan.toString()),
+        sisa_piutang: linkedPenjualan ? parseFloat(linkedPenjualan.sisa_piutang.toString()) : 0,
+        grand_total: linkedPenjualan ? parseFloat(linkedPenjualan.grand_total.toString()) : parseFloat(bk.saldo.toString()),
+        status_piutang: linkedPenjualan?.status || 'lunas',
+        created_at: bk.created_at.toISOString(),
+        details: bk.details.map((d) => ({
+          id: d.id.toString(),
+          jenis_daging_id: d.jenis_daging_id.toString(),
+          jenis_daging: {
+            id: d.jenis_daging.id.toString(),
+            nama_jenis: d.jenis_daging.nama_jenis,
+          },
+          berat_kg: parseFloat(d.berat_kg.toString()),
+          harga_per_kg: parseFloat(d.harga_per_kg.toString()),
+          subtotal: parseFloat(d.subtotal.toString()),
+        })),
+      };
     }));
 
     return NextResponse.json({ success: true, data: formattedData });
@@ -105,7 +157,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST - Create new barang keluar daging with details
+// POST - Create new barang keluar daging with details + auto penjualan (piutang)
 export async function POST(req: Request) {
   try {
     const validation = await validateAdmin();
@@ -162,18 +214,21 @@ export async function POST(req: Request) {
       };
     });
 
-    const saldo = totalPenjualan - (pengeluaran || 0);
+    const pengeluaranVal = pengeluaran || 0;
+    const saldo = totalPenjualan - pengeluaranVal;
+    const grandTotal = totalPenjualan - pengeluaranVal;
     const namaCustomer = nama_customer?.trim() || customer.nama;
-    const bayar = jumlah_bayar !== undefined && jumlah_bayar !== null ? parseFloat(jumlah_bayar) : totalPenjualan;
-    const sisaPiutang = totalPenjualan - bayar;
+    const bayar = jumlah_bayar !== undefined && jumlah_bayar !== null ? parseFloat(jumlah_bayar) : 0;
+    const sisaPiutang = Math.max(0, grandTotal - bayar);
+    const statusVal = computeStatus(grandTotal, bayar);
     const metodePembayaran = metode_pembayaran || 'CASH';
 
     // Validasi jumlah bayar
     if (bayar < 0) {
       return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh negatif' }, { status: 400 });
     }
-    if (bayar > totalPenjualan) {
-      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh melebihi total penjualan' }, { status: 400 });
+    if (bayar > grandTotal) {
+      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh melebihi grand total' }, { status: 400 });
     }
 
     // Create header with details + penjualan in transaction
@@ -183,7 +238,7 @@ export async function POST(req: Request) {
           tanggal: new Date(tanggal),
           nama_customer: namaCustomer,
           total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
-          pengeluaran: new Decimal((pengeluaran || 0).toFixed(2)),
+          pengeluaran: new Decimal(pengeluaranVal.toFixed(2)),
           saldo: new Decimal(saldo.toFixed(2)),
           keterangan: keterangan || null,
           details: {
@@ -197,36 +252,63 @@ export async function POST(req: Request) {
         },
       });
 
-      // Create Penjualan record (financial layer)
-      await tx.penjualan.create({
+      // Generate nomor nota
+      const nomorNota = await generateNomorNota(new Date(tanggal), tx);
+
+      // Lookup jenis_daging names for penjualan detail
+      const jenisDagingIds = (details as DetailItem[]).map(d => BigInt(d.jenis_daging_id));
+      const jenisDagingList = await tx.jenisDaging.findMany({
+        where: { id: { in: jenisDagingIds } },
+        select: { id: true, nama_jenis: true },
+      });
+      const jenisDagingMap = new Map(jenisDagingList.map(j => [j.id.toString(), j.nama_jenis]));
+
+      // Create Penjualan record with full piutang fields + detail
+      const penjualan = await tx.penjualan.create({
         data: {
+          nomor_nota: nomorNota,
           customer_id: BigInt(customer_id),
           tanggal: new Date(tanggal),
           jenis_transaksi: 'DAGING',
           total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
+          pengeluaran: new Decimal(pengeluaranVal.toFixed(2)),
+          grand_total: new Decimal(grandTotal.toFixed(2)),
           jumlah_bayar: new Decimal(bayar.toFixed(2)),
           sisa_piutang: new Decimal(sisaPiutang.toFixed(2)),
+          status: statusVal,
           metode_pembayaran: metodePembayaran,
           keterangan: `Barang Keluar Daging #${header.id} - ${namaCustomer}`,
+          detail: {
+            create: (details as DetailItem[]).map((item) => ({
+              jenis_daging: jenisDagingMap.get(item.jenis_daging_id) || null,
+              ekor: null,
+              berat: new Decimal(item.berat_kg.toFixed(2)),
+              harga: new Decimal(item.harga_per_kg.toFixed(2)),
+              subtotal: new Decimal((item.berat_kg * item.harga_per_kg).toFixed(2)),
+            })),
+          },
         },
       });
 
-      return header;
+      return { header, penjualan };
     });
 
     return NextResponse.json({
       success: true,
       message: 'Data berhasil disimpan',
       data: {
-        id: result.id.toString(),
-        tanggal: result.tanggal.toISOString().split('T')[0],
-        nama_customer: result.nama_customer,
-        total_penjualan: parseFloat(result.total_penjualan.toString()),
-        pengeluaran: parseFloat(result.pengeluaran.toString()),
-        saldo: parseFloat(result.saldo.toString()),
+        id: result.header.id.toString(),
+        tanggal: result.header.tanggal.toISOString().split('T')[0],
+        nama_customer: result.header.nama_customer,
+        total_penjualan: parseFloat(result.header.total_penjualan.toString()),
+        pengeluaran: parseFloat(result.header.pengeluaran.toString()),
+        saldo: parseFloat(result.header.saldo.toString()),
+        grand_total: grandTotal,
         jumlah_bayar: bayar,
         sisa_piutang: sisaPiutang,
-        detail_count: result.details.length,
+        status: statusVal,
+        nomor_nota: result.penjualan.nomor_nota,
+        detail_count: result.header.details.length,
       },
     });
   } catch (error) {
@@ -235,7 +317,7 @@ export async function POST(req: Request) {
   }
 }
 
-// PUT - Update barang keluar daging with details
+// PUT - Update barang keluar daging with details + update penjualan
 export async function PUT(req: Request) {
   try {
     const validation = await validateAdmin();
@@ -305,18 +387,21 @@ export async function PUT(req: Request) {
       };
     });
 
-    const saldo = totalPenjualan - (pengeluaran || 0);
+    const pengeluaranVal = pengeluaran || 0;
+    const saldo = totalPenjualan - pengeluaranVal;
+    const grandTotal = totalPenjualan - pengeluaranVal;
     const namaCustomer = nama_customer?.trim() || customer.nama;
-    const bayar = jumlah_bayar !== undefined && jumlah_bayar !== null ? parseFloat(jumlah_bayar) : totalPenjualan;
-    const sisaPiutang = totalPenjualan - bayar;
+    const bayar = jumlah_bayar !== undefined && jumlah_bayar !== null ? parseFloat(jumlah_bayar) : 0;
+    const sisaPiutang = Math.max(0, grandTotal - bayar);
+    const statusVal = computeStatus(grandTotal, bayar);
     const metodePembayaran = metode_pembayaran || 'CASH';
 
     // Validasi jumlah bayar
     if (bayar < 0) {
       return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh negatif' }, { status: 400 });
     }
-    if (bayar > totalPenjualan) {
-      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh melebihi total penjualan' }, { status: 400 });
+    if (bayar > grandTotal) {
+      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh melebihi grand total' }, { status: 400 });
     }
 
     // Update header, replace details, and update/create penjualan in transaction
@@ -333,7 +418,7 @@ export async function PUT(req: Request) {
           tanggal: new Date(tanggal),
           nama_customer: namaCustomer,
           total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
-          pengeluaran: new Decimal((pengeluaran || 0).toFixed(2)),
+          pengeluaran: new Decimal(pengeluaranVal.toFixed(2)),
           saldo: new Decimal(saldo.toFixed(2)),
           keterangan: keterangan || null,
           details: {
@@ -347,6 +432,14 @@ export async function PUT(req: Request) {
         },
       });
 
+      // Lookup jenis_daging names
+      const jenisDagingIds = (details as DetailItem[]).map(d => BigInt(d.jenis_daging_id));
+      const jenisDagingList = await tx.jenisDaging.findMany({
+        where: { id: { in: jenisDagingIds } },
+        select: { id: true, nama_jenis: true },
+      });
+      const jenisDagingMap = new Map(jenisDagingList.map(j => [j.id.toString(), j.nama_jenis]));
+
       // Find linked penjualan by keterangan pattern
       const linkedPenjualan = await tx.penjualan.findFirst({
         where: {
@@ -356,29 +449,60 @@ export async function PUT(req: Request) {
       });
 
       if (linkedPenjualan) {
+        // Delete existing penjualan detail
+        await tx.penjualanDetail.deleteMany({
+          where: { penjualan_id: linkedPenjualan.id },
+        });
+
         await tx.penjualan.update({
           where: { id: linkedPenjualan.id },
           data: {
             customer_id: BigInt(customer_id),
             tanggal: new Date(tanggal),
             total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
+            pengeluaran: new Decimal(pengeluaranVal.toFixed(2)),
+            grand_total: new Decimal(grandTotal.toFixed(2)),
             jumlah_bayar: new Decimal(bayar.toFixed(2)),
             sisa_piutang: new Decimal(sisaPiutang.toFixed(2)),
+            status: statusVal,
             metode_pembayaran: metodePembayaran,
             keterangan: `Barang Keluar Daging #${id} - ${namaCustomer}`,
+            detail: {
+              create: (details as DetailItem[]).map((item) => ({
+                jenis_daging: jenisDagingMap.get(item.jenis_daging_id) || null,
+                ekor: null,
+                berat: new Decimal(item.berat_kg.toFixed(2)),
+                harga: new Decimal(item.harga_per_kg.toFixed(2)),
+                subtotal: new Decimal((item.berat_kg * item.harga_per_kg).toFixed(2)),
+              })),
+            },
           },
         });
       } else {
+        const nomorNota = await generateNomorNota(new Date(tanggal), tx);
         await tx.penjualan.create({
           data: {
+            nomor_nota: nomorNota,
             customer_id: BigInt(customer_id),
             tanggal: new Date(tanggal),
             jenis_transaksi: 'DAGING',
             total_penjualan: new Decimal(totalPenjualan.toFixed(2)),
+            pengeluaran: new Decimal(pengeluaranVal.toFixed(2)),
+            grand_total: new Decimal(grandTotal.toFixed(2)),
             jumlah_bayar: new Decimal(bayar.toFixed(2)),
             sisa_piutang: new Decimal(sisaPiutang.toFixed(2)),
+            status: statusVal,
             metode_pembayaran: metodePembayaran,
             keterangan: `Barang Keluar Daging #${id} - ${namaCustomer}`,
+            detail: {
+              create: (details as DetailItem[]).map((item) => ({
+                jenis_daging: jenisDagingMap.get(item.jenis_daging_id) || null,
+                ekor: null,
+                berat: new Decimal(item.berat_kg.toFixed(2)),
+                harga: new Decimal(item.harga_per_kg.toFixed(2)),
+                subtotal: new Decimal((item.berat_kg * item.harga_per_kg).toFixed(2)),
+              })),
+            },
           },
         });
       }
@@ -396,8 +520,10 @@ export async function PUT(req: Request) {
         total_penjualan: parseFloat(result.total_penjualan.toString()),
         pengeluaran: parseFloat(result.pengeluaran.toString()),
         saldo: parseFloat(result.saldo.toString()),
+        grand_total: grandTotal,
         jumlah_bayar: bayar,
         sisa_piutang: sisaPiutang,
+        status: statusVal,
         detail_count: result.details.length,
       },
     });
@@ -407,7 +533,7 @@ export async function PUT(req: Request) {
   }
 }
 
-// DELETE - Delete barang keluar daging (cascade deletes details)
+// DELETE - Delete barang keluar daging (cascade deletes details) + linked penjualan
 export async function DELETE(req: Request) {
   try {
     const validation = await validateAdmin();
@@ -433,7 +559,7 @@ export async function DELETE(req: Request) {
 
     // Delete (cascade deletes details) + linked penjualan
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Delete linked penjualan record
+      // Delete linked penjualan record (cascade deletes penjualan detail)
       const linkedPenjualan = await tx.penjualan.findFirst({
         where: {
           keterangan: { contains: `Barang Keluar Daging #${id}` },

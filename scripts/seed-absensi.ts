@@ -100,7 +100,7 @@ async function main() {
           tanggal_mulai: new Date(Date.UTC(year, month, 5)),
           tanggal_selesai: new Date(Date.UTC(year, month, 5)),
           alasan: 'Keperluan keluarga',
-          status: 'DISETUJUI',
+          status: 'APPROVED',
         },
       });
       izinCreated++;

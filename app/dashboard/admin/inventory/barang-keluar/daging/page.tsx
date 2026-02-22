@@ -23,6 +23,7 @@ interface BarangKeluarDaging {
   pengeluaran: number; keterangan: string | null; total_penjualan: number; saldo: number;
   details: { id: string; jenis_daging_id: string; jenis_daging: JenisDaging; berat_kg: number; harga_per_kg: number; subtotal: number }[];
   created_at: string;
+  nomor_nota?: string; jumlah_bayar?: number; sisa_piutang?: number; status_piutang?: string;
 }
 
 export default function BarangKeluarDagingPage() {
@@ -39,7 +40,7 @@ export default function BarangKeluarDagingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [viewingData, setViewingData] = useState<BarangKeluarDaging | null>(null);
-  const [formHeader, setFormHeader] = useState({ tanggal: '', customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH' });
+  const [formHeader, setFormHeader] = useState({ tanggal: '', customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang' });
   const [formDetails, setFormDetails] = useState<DetailItem[]>([{ jenis_daging_id: '', berat_kg: '', harga_per_kg: '', subtotal: 0 }]);
 
   useEffect(() => { fetchJenisDaging(); fetchCustomers(); }, []);
@@ -57,7 +58,7 @@ export default function BarangKeluarDagingPage() {
   const openAddModal = () => {
     setModalMode('add'); setSelectedData(null);
     const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    setFormHeader({ tanggal: localDate, customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH' });
+    setFormHeader({ tanggal: localDate, customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang' });
     setFormDetails([{ jenis_daging_id: '', berat_kg: '', harga_per_kg: '', subtotal: 0 }]);
     setShowModal(true);
   };
@@ -65,7 +66,8 @@ export default function BarangKeluarDagingPage() {
   const openEditModal = (item: BarangKeluarDaging) => {
     setModalMode('edit'); setSelectedData(item);
     const matchedCustomer = customerList.find(c => c.nama === item.nama_customer);
-    setFormHeader({ tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', pengeluaran: item.pengeluaran.toString(), keterangan: item.keterangan || '', jumlah_bayar: item.total_penjualan.toString(), metode_pembayaran: 'CASH' });
+    const tipePembayaran = ((item.jumlah_bayar ?? 0) === 0 ? 'hutang' : (item.jumlah_bayar ?? 0) >= item.total_penjualan ? 'lunas' : 'sebagian') as 'lunas' | 'sebagian' | 'hutang';
+    setFormHeader({ tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', pengeluaran: item.pengeluaran.toString(), keterangan: item.keterangan || '', jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran });
     setFormDetails(item.details.map(d => ({ jenis_daging_id: d.jenis_daging_id || d.jenis_daging.id, berat_kg: d.berat_kg.toString(), harga_per_kg: d.harga_per_kg.toString(), subtotal: d.subtotal })));
     setShowModal(true);
   };
@@ -82,7 +84,7 @@ export default function BarangKeluarDagingPage() {
 
   const calculatedTotal = useMemo(() => formDetails.reduce((s, d) => s + d.subtotal, 0), [formDetails]);
   const calculatedSaldo = useMemo(() => calculatedTotal - (parseFloat(formHeader.pengeluaran) || 0), [calculatedTotal, formHeader.pengeluaran]);
-  const calculatedJumlahBayar = useMemo(() => { const val = parseFloat(formHeader.jumlah_bayar); return isNaN(val) ? calculatedTotal : val; }, [formHeader.jumlah_bayar, calculatedTotal]);
+  const calculatedJumlahBayar = useMemo(() => { if (formHeader.tipe_pembayaran === 'hutang') return 0; if (formHeader.tipe_pembayaran === 'lunas') return calculatedTotal; const val = parseFloat(formHeader.jumlah_bayar); return isNaN(val) ? 0 : val; }, [formHeader.tipe_pembayaran, formHeader.jumlah_bayar, calculatedTotal]);
   const calculatedSisaPiutang = useMemo(() => Math.max(0, calculatedTotal - calculatedJumlahBayar), [calculatedTotal, calculatedJumlahBayar]);
 
   const summary = useMemo(() => ({
@@ -340,9 +342,38 @@ export default function BarangKeluarDagingPage() {
             {/* Payment Section */}
             <div className="rounded-md border border-amber-200 bg-amber-50/50 p-4 space-y-3">
               <p className="font-semibold text-amber-800 text-sm">Pembayaran</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label className="text-xs">Jumlah Bayar</Label><Input type="number" placeholder="Bayar lunas" value={formHeader.jumlah_bayar} onChange={(e) => setFormHeader({ ...formHeader, jumlah_bayar: e.target.value })} min={0} /><p className="text-xs text-muted-foreground">Kosongkan jika bayar lunas</p></div>
-                <div className="space-y-2"><Label className="text-xs">Metode Pembayaran</Label><select value={formHeader.metode_pembayaran} onChange={(e) => setFormHeader({ ...formHeader, metode_pembayaran: e.target.value })} className={selectClass}><option value="CASH">Cash</option><option value="TRANSFER">Transfer</option><option value="CAMPUR">Campur</option></select></div>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  {(['lunas', 'sebagian', 'hutang'] as const).map((tipe) => (
+                    <button key={tipe} type="button" onClick={() => setFormHeader({ ...formHeader, tipe_pembayaran: tipe, jumlah_bayar: '' })}
+                      className={`flex-1 py-2 px-3 rounded-md text-sm font-medium border transition-colors ${formHeader.tipe_pembayaran === tipe
+                        ? tipe === 'lunas' ? 'bg-emerald-100 border-emerald-500 text-emerald-700'
+                          : tipe === 'sebagian' ? 'bg-blue-100 border-blue-500 text-blue-700'
+                          : 'bg-red-100 border-red-500 text-red-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                      {tipe === 'lunas' ? 'Bayar Lunas' : tipe === 'sebagian' ? 'Bayar Sebagian' : 'Hutang Penuh'}
+                    </button>
+                  ))}
+                </div>
+                {formHeader.tipe_pembayaran === 'sebagian' && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Jumlah Bayar</Label>
+                    <Input type="number" placeholder="Masukkan jumlah bayar" value={formHeader.jumlah_bayar} onChange={(e) => setFormHeader({ ...formHeader, jumlah_bayar: e.target.value })} min={1} max={calculatedTotal} required />
+                  </div>
+                )}
+                {formHeader.tipe_pembayaran !== 'hutang' && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Metode Pembayaran</Label>
+                    <select value={formHeader.metode_pembayaran} onChange={(e) => setFormHeader({ ...formHeader, metode_pembayaran: e.target.value })} className={selectClass}>
+                      <option value="CASH">Cash</option>
+                      <option value="TRANSFER">Transfer</option>
+                      <option value="CAMPUR">Campur</option>
+                    </select>
+                  </div>
+                )}
+                {formHeader.tipe_pembayaran === 'hutang' && (
+                  <p className="text-xs text-red-600 font-medium">Customer tidak membayar, seluruh transaksi menjadi piutang</p>
+                )}
               </div>
             </div>
 
