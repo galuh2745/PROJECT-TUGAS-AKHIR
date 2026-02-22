@@ -20,6 +20,7 @@ interface StokPerusahaan { perusahaan_id: string; nama_perusahaan: string; total
 interface BarangKeluarAyamHidup {
   id: string; perusahaan_id: string; perusahaan: Perusahaan; tanggal: string; nama_customer: string;
   jumlah_ekor: number; total_kg: number; jenis_daging: 'JUMBO' | 'BESAR' | 'KECIL'; harga_per_kg: number;
+  is_bubut: boolean; harga_bubut: number;
   total_penjualan: number; pengeluaran: number; total_bersih: number; created_at: string;
   nomor_nota?: string; jumlah_bayar?: number; sisa_piutang?: number; status_piutang?: string;
 }
@@ -42,6 +43,7 @@ export default function BarangKeluarAyamHidupPage() {
     perusahaan_id: '', tanggal: '', customer_id: '', jumlah_ekor: '', total_kg: '',
     jenis_daging: 'BESAR' as 'JUMBO' | 'BESAR' | 'KECIL', harga_per_kg: '', pengeluaran: '',
     jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang',
+    is_bubut: false, harga_bubut: '',
   });
 
   useEffect(() => { fetchPerusahaan(); fetchStok(); fetchCustomers(); }, []);
@@ -61,18 +63,19 @@ export default function BarangKeluarAyamHidupPage() {
   const openAddModal = () => {
     setModalMode('add'); setSelectedData(null);
     const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    setFormData({ perusahaan_id: '', tanggal: localDate, customer_id: '', jumlah_ekor: '', total_kg: '', jenis_daging: 'BESAR', harga_per_kg: '', pengeluaran: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang' });
+    setFormData({ perusahaan_id: '', tanggal: localDate, customer_id: '', jumlah_ekor: '', total_kg: '', jenis_daging: 'BESAR', harga_per_kg: '', pengeluaran: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang', is_bubut: false, harga_bubut: '' });
     setShowModal(true);
   };
   const openEditModal = (item: BarangKeluarAyamHidup) => {
     setModalMode('edit'); setSelectedData(item);
     const matchedCustomer = customerList.find(c => c.nama === item.nama_customer);
     const tipePembayaran = ((item.jumlah_bayar ?? 0) === 0 ? 'hutang' : (item.jumlah_bayar ?? 0) >= item.total_penjualan ? 'lunas' : 'sebagian') as 'lunas' | 'sebagian' | 'hutang';
-    setFormData({ perusahaan_id: item.perusahaan_id, tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), jenis_daging: item.jenis_daging, harga_per_kg: item.harga_per_kg.toString(), pengeluaran: item.pengeluaran.toString(), jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran });
+    setFormData({ perusahaan_id: item.perusahaan_id, tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), jenis_daging: item.jenis_daging, harga_per_kg: item.harga_per_kg.toString(), pengeluaran: item.pengeluaran.toString(), jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran, is_bubut: item.is_bubut || false, harga_bubut: item.harga_bubut ? item.harga_bubut.toString() : '' });
     setShowModal(true);
   };
 
-  const calculatedTotalPenjualan = useMemo(() => (parseFloat(formData.total_kg) || 0) * (parseFloat(formData.harga_per_kg) || 0), [formData.total_kg, formData.harga_per_kg]);
+  const calculatedBiayaBubut = useMemo(() => formData.is_bubut ? (parseFloat(formData.harga_bubut) || 0) * (parseInt(formData.jumlah_ekor) || 0) : 0, [formData.is_bubut, formData.harga_bubut, formData.jumlah_ekor]);
+  const calculatedTotalPenjualan = useMemo(() => ((parseFloat(formData.total_kg) || 0) * (parseFloat(formData.harga_per_kg) || 0)) + calculatedBiayaBubut, [formData.total_kg, formData.harga_per_kg, calculatedBiayaBubut]);
   const calculatedTotalBersih = useMemo(() => calculatedTotalPenjualan - (parseFloat(formData.pengeluaran) || 0), [calculatedTotalPenjualan, formData.pengeluaran]);
   const calculatedJumlahBayar = useMemo(() => {
     if (formData.tipe_pembayaran === 'hutang') return 0;
@@ -108,6 +111,8 @@ export default function BarangKeluarAyamHidupPage() {
         pengeluaran: parseFloat(formData.pengeluaran) || 0,
         jumlah_bayar: calculatedJumlahBayar,
         metode_pembayaran: formData.metode_pembayaran,
+        is_bubut: formData.is_bubut,
+        harga_bubut: formData.is_bubut ? (parseFloat(formData.harga_bubut) || 0) : 0,
       };
       const r = await fetch('/api/inventory/barang-keluar/ayam-hidup', { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
       const res = await r.json(); if (res.success) { toast.success('Data berhasil disimpan'); setShowModal(false); fetchData(); fetchStok(); } else toast.error(res.error);
@@ -214,6 +219,26 @@ export default function BarangKeluarAyamHidupPage() {
             </div>
             <div className="space-y-2"><Label>Pengeluaran</Label><Input type="number" value={formData.pengeluaran} onChange={(e) => setFormData({ ...formData, pengeluaran: e.target.value })} min={0} /></div>
 
+            {/* Bubut Section */}
+            <div className="rounded-md border border-purple-200 bg-purple-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-blue-800 text-sm">Bubut (Cabut Bulu)</p>
+                <button type="button" onClick={() => setFormData({ ...formData, is_bubut: !formData.is_bubut, harga_bubut: '' })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.is_bubut ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_bubut ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              {formData.is_bubut && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Harga Bubut per Ekor <span className="text-red-500">*</span></Label>
+                  <Input type="number" placeholder="Masukkan harga bubut per ekor" value={formData.harga_bubut} onChange={(e) => setFormData({ ...formData, harga_bubut: e.target.value })} min={1} required />
+                  {formData.harga_bubut && formData.jumlah_ekor && (
+                    <p className="text-xs text-blue-600 font-medium">Total biaya bubut: {fmtC((parseFloat(formData.harga_bubut) || 0) * (parseInt(formData.jumlah_ekor) || 0))} ({formData.jumlah_ekor} ekor × {fmtC(parseFloat(formData.harga_bubut) || 0)})</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Payment Section */}
             <div className="rounded-md border border-amber-200 bg-amber-50/50 p-4 space-y-3">
               <p className="font-semibold text-amber-800 text-sm">Pembayaran</p>
@@ -253,7 +278,11 @@ export default function BarangKeluarAyamHidupPage() {
             </div>
 
             <Card className="bg-muted/50"><CardContent className="pt-4 space-y-1 text-sm">
-              <div className="flex justify-between"><span>Total Penjualan:</span><span className="font-bold text-blue-600">{fmtC(calculatedTotalPenjualan)}</span></div>
+              <div className="flex justify-between"><span>Harga Ayam ({formData.total_kg || 0} kg × {fmtC(parseFloat(formData.harga_per_kg) || 0)}):</span><span className="font-medium">{fmtC((parseFloat(formData.total_kg) || 0) * (parseFloat(formData.harga_per_kg) || 0))}</span></div>
+              {formData.is_bubut && calculatedBiayaBubut > 0 && (
+                <div className="flex justify-between"><span>Biaya Bubut ({formData.jumlah_ekor || 0} ekor × {fmtC(parseFloat(formData.harga_bubut) || 0)}):</span><span className="font-medium text-blue-600">{fmtC(calculatedBiayaBubut)}</span></div>
+              )}
+              <div className="flex justify-between border-t pt-1"><span className="font-semibold">Total Penjualan:</span><span className="font-bold text-blue-600">{fmtC(calculatedTotalPenjualan)}</span></div>
               <div className="flex justify-between"><span>Pengeluaran:</span><span className="text-red-600">{fmtC(parseFloat(formData.pengeluaran) || 0)}</span></div>
               <div className="flex justify-between border-t pt-1"><span className="font-medium">Total Bersih:</span><span className={`font-bold ${calculatedTotalBersih >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtC(calculatedTotalBersih)}</span></div>
               <div className="flex justify-between border-t pt-1"><span>Jumlah Bayar:</span><span className="font-bold text-emerald-600">{fmtC(calculatedJumlahBayar)}</span></div>

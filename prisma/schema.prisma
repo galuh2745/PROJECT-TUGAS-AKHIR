@@ -135,6 +135,8 @@ model BarangKeluarAyamHidup {
   total_kg        Decimal    @db.Decimal(10, 2)
   jenis_daging    String     @default("BESAR") @db.VarChar(10)
   harga_per_kg    Decimal    @db.Decimal(12, 2)
+  is_bubut        Boolean    @default(false)
+  harga_bubut     Decimal    @default(0.00) @db.Decimal(12, 2)
   total_penjualan Decimal    @db.Decimal(15, 2)
   pengeluaran     Decimal    @default(0.00) @db.Decimal(15, 2)
   total_bersih    Decimal    @default(0.00) @db.Decimal(15, 2)

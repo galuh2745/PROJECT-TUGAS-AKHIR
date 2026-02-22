@@ -154,6 +154,8 @@ export async function GET(req: Request) {
         total_kg: parseFloat(bk.total_kg.toString()),
         jenis_daging: bk.jenis_daging,
         harga_per_kg: parseFloat(bk.harga_per_kg.toString()),
+        is_bubut: bk.is_bubut,
+        harga_bubut: parseFloat(bk.harga_bubut.toString()),
         total_penjualan: parseFloat(bk.total_penjualan.toString()),
         pengeluaran: parseFloat(bk.pengeluaran.toString()),
         total_bersih: parseFloat(bk.total_bersih.toString()),
@@ -195,6 +197,8 @@ export async function POST(req: Request) {
       pengeluaran,
       jumlah_bayar,
       metode_pembayaran,
+      is_bubut,
+      harga_bubut,
     } = body;
 
     // Validasi input wajib
@@ -248,7 +252,8 @@ export async function POST(req: Request) {
     }
 
     // Hitung nilai otomatis
-    const total_penjualan = harga_per_kg * total_kg;
+    const biayaBubutPost = is_bubut ? (parseFloat(harga_bubut) || 0) * parseInt(jumlah_ekor) : 0;
+    const total_penjualan = (harga_per_kg * total_kg) + biayaBubutPost;
     const pengeluaranVal = pengeluaran || 0;
     const total_bersih = total_penjualan - pengeluaranVal;
     const grandTotal = total_penjualan - pengeluaranVal;
@@ -279,6 +284,8 @@ export async function POST(req: Request) {
           total_kg: new Decimal(total_kg),
           jenis_daging: jenis_daging,
           harga_per_kg: new Decimal(harga_per_kg),
+          is_bubut: is_bubut || false,
+          harga_bubut: new Decimal(is_bubut ? (parseFloat(harga_bubut) || 0) : 0),
           total_penjualan: new Decimal(total_penjualan.toFixed(2)),
           pengeluaran: new Decimal(pengeluaranVal),
           total_bersih: new Decimal(total_bersih.toFixed(2)),
@@ -373,6 +380,8 @@ export async function PUT(req: Request) {
       pengeluaran,
       jumlah_bayar,
       metode_pembayaran,
+      is_bubut,
+      harga_bubut,
     } = body;
 
     if (!id) {
@@ -432,7 +441,8 @@ export async function PUT(req: Request) {
     }
 
     // Hitung nilai otomatis
-    const total_penjualan = harga_per_kg * total_kg;
+    const biayaBubut = is_bubut ? (parseFloat(harga_bubut) || 0) * parseInt(jumlah_ekor) : 0;
+    const total_penjualan = (harga_per_kg * total_kg) + biayaBubut;
     const pengeluaranVal = pengeluaran || 0;
     const total_bersih = total_penjualan - pengeluaranVal;
     const grandTotal = total_penjualan - pengeluaranVal;
@@ -462,13 +472,13 @@ export async function PUT(req: Request) {
           total_kg: new Decimal(total_kg),
           jenis_daging: jenis_daging,
           harga_per_kg: new Decimal(harga_per_kg),
+          is_bubut: is_bubut || false,
+          harga_bubut: new Decimal(is_bubut ? (parseFloat(harga_bubut) || 0) : 0),
           total_penjualan: new Decimal(total_penjualan.toFixed(2)),
           pengeluaran: new Decimal(pengeluaranVal),
           total_bersih: new Decimal(total_bersih.toFixed(2)),
         }
       });
-
-      // Find linked penjualan by keterangan pattern
       const linkedPenjualan = await tx.penjualan.findFirst({
         where: {
           keterangan: { contains: `Barang Keluar Ayam Hidup #${id}` },
