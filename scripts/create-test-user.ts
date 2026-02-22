@@ -18,11 +18,11 @@ async function createTestUsers() {
     const hashedPassword = await bcrypt.hash('password123', 10);
 
     // User 1: Admin
-    let admin = await prisma.user.findFirst({ where: { name: 'Admin User' } });
+    let admin = await prisma.user.findFirst({ where: { name: 'Administrator' } });
     if (!admin) {
       admin = await prisma.user.create({
         data: {
-          name: 'Admin User',
+          name: 'Administrator',
           password: hashedPassword,
           role: 'ADMIN',
         },
@@ -70,7 +70,7 @@ async function createTestUsers() {
 
     console.log('🎉 Semua user test berhasil dibuat!');
     console.log('\n📝 Gunakan kredensial berikut untuk login:');
-    console.log('   Admin: Admin User / password123');
+    console.log('   Admin: Administrator / password123');
     console.log('   Owner: Owner User / password123');
     console.log('   User:  Regular User / password123');
   } catch (error) {

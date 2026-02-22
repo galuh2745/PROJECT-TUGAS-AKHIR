@@ -10,6 +10,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FadeIn } from '@/components/ui/page-transition';
 
+function PasswordField({ label, id, value, onChange, show, toggleShow }: { label: string; id: string; value: string; onChange: (v: string) => void; show: boolean; toggleShow: () => void }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input id={id} type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} placeholder="••••••••" className="pr-10" required />
+        <button type="button" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" onClick={toggleShow}>
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ChangePasswordPage() {
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
@@ -35,18 +49,6 @@ export default function ChangePasswordPage() {
       } else toast.error(result.error || 'Gagal mengubah password');
     } catch { toast.error('Terjadi kesalahan'); } finally { setLoading(false); }
   };
-
-  const PasswordField = ({ label, id, value, onChange, show, toggleShow }: { label: string; id: string; value: string; onChange: (v: string) => void; show: boolean; toggleShow: () => void }) => (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input id={id} type={show ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} placeholder="••••••••" required />
-        <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" onClick={toggleShow}>
-          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="max-w-md mx-auto">
