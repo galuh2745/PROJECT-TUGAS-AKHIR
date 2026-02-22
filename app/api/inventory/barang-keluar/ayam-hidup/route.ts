@@ -158,6 +158,7 @@ export async function GET(req: Request) {
         harga_bubut: parseFloat(bk.harga_bubut.toString()),
         total_penjualan: parseFloat(bk.total_penjualan.toString()),
         pengeluaran: parseFloat(bk.pengeluaran.toString()),
+        keterangan: bk.keterangan || null,
         total_bersih: parseFloat(bk.total_bersih.toString()),
         // Piutang info from linked penjualan
         nomor_nota: linkedPenjualan?.nomor_nota || null,
@@ -199,6 +200,7 @@ export async function POST(req: Request) {
       metode_pembayaran,
       is_bubut,
       harga_bubut,
+      keterangan,
     } = body;
 
     // Validasi input wajib
@@ -288,6 +290,7 @@ export async function POST(req: Request) {
           harga_bubut: new Decimal(is_bubut ? (parseFloat(harga_bubut) || 0) : 0),
           total_penjualan: new Decimal(total_penjualan.toFixed(2)),
           pengeluaran: new Decimal(pengeluaranVal),
+          keterangan: keterangan || null,
           total_bersih: new Decimal(total_bersih.toFixed(2)),
         },
         include: {
@@ -382,6 +385,7 @@ export async function PUT(req: Request) {
       metode_pembayaran,
       is_bubut,
       harga_bubut,
+      keterangan,
     } = body;
 
     if (!id) {
@@ -476,6 +480,7 @@ export async function PUT(req: Request) {
           harga_bubut: new Decimal(is_bubut ? (parseFloat(harga_bubut) || 0) : 0),
           total_penjualan: new Decimal(total_penjualan.toFixed(2)),
           pengeluaran: new Decimal(pengeluaranVal),
+          keterangan: keterangan || null,
           total_bersih: new Decimal(total_bersih.toFixed(2)),
         }
       });

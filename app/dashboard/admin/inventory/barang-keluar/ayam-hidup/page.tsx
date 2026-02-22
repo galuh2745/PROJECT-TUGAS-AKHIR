@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -21,7 +22,7 @@ interface BarangKeluarAyamHidup {
   id: string; perusahaan_id: string; perusahaan: Perusahaan; tanggal: string; nama_customer: string;
   jumlah_ekor: number; total_kg: number; jenis_daging: 'JUMBO' | 'BESAR' | 'KECIL'; harga_per_kg: number;
   is_bubut: boolean; harga_bubut: number;
-  total_penjualan: number; pengeluaran: number; total_bersih: number; created_at: string;
+  total_penjualan: number; pengeluaran: number; keterangan?: string | null; total_bersih: number; created_at: string;
   nomor_nota?: string; jumlah_bayar?: number; sisa_piutang?: number; status_piutang?: string;
 }
 
@@ -43,7 +44,7 @@ export default function BarangKeluarAyamHidupPage() {
     perusahaan_id: '', tanggal: '', customer_id: '', jumlah_ekor: '', total_kg: '',
     jenis_daging: 'BESAR' as 'JUMBO' | 'BESAR' | 'KECIL', harga_per_kg: '', pengeluaran: '',
     jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang',
-    is_bubut: false, harga_bubut: '',
+    is_bubut: false, harga_bubut: '', keterangan: '',
   });
 
   useEffect(() => { fetchPerusahaan(); fetchStok(); fetchCustomers(); }, []);
@@ -63,14 +64,14 @@ export default function BarangKeluarAyamHidupPage() {
   const openAddModal = () => {
     setModalMode('add'); setSelectedData(null);
     const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    setFormData({ perusahaan_id: '', tanggal: localDate, customer_id: '', jumlah_ekor: '', total_kg: '', jenis_daging: 'BESAR', harga_per_kg: '', pengeluaran: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang', is_bubut: false, harga_bubut: '' });
+    setFormData({ perusahaan_id: '', tanggal: localDate, customer_id: '', jumlah_ekor: '', total_kg: '', jenis_daging: 'BESAR', harga_per_kg: '', pengeluaran: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang', is_bubut: false, harga_bubut: '', keterangan: '' });
     setShowModal(true);
   };
   const openEditModal = (item: BarangKeluarAyamHidup) => {
     setModalMode('edit'); setSelectedData(item);
     const matchedCustomer = customerList.find(c => c.nama === item.nama_customer);
     const tipePembayaran = ((item.jumlah_bayar ?? 0) === 0 ? 'hutang' : (item.jumlah_bayar ?? 0) >= item.total_penjualan ? 'lunas' : 'sebagian') as 'lunas' | 'sebagian' | 'hutang';
-    setFormData({ perusahaan_id: item.perusahaan_id, tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), jenis_daging: item.jenis_daging, harga_per_kg: item.harga_per_kg.toString(), pengeluaran: item.pengeluaran.toString(), jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran, is_bubut: item.is_bubut || false, harga_bubut: item.harga_bubut ? item.harga_bubut.toString() : '' });
+    setFormData({ perusahaan_id: item.perusahaan_id, tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), jenis_daging: item.jenis_daging, harga_per_kg: item.harga_per_kg.toString(), pengeluaran: item.pengeluaran.toString(), jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran, is_bubut: item.is_bubut || false, harga_bubut: item.harga_bubut ? item.harga_bubut.toString() : '', keterangan: item.keterangan || '' });
     setShowModal(true);
   };
 
@@ -113,6 +114,7 @@ export default function BarangKeluarAyamHidupPage() {
         metode_pembayaran: formData.metode_pembayaran,
         is_bubut: formData.is_bubut,
         harga_bubut: formData.is_bubut ? (parseFloat(formData.harga_bubut) || 0) : 0,
+        keterangan: formData.keterangan || '',
       };
       const r = await fetch('/api/inventory/barang-keluar/ayam-hidup', { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
       const res = await r.json(); if (res.success) { toast.success('Data berhasil disimpan'); setShowModal(false); fetchData(); fetchStok(); } else toast.error(res.error);
@@ -218,6 +220,7 @@ export default function BarangKeluarAyamHidupPage() {
               <div className="space-y-2"><Label>Harga per Kg <span className="text-red-500">*</span></Label><Input type="number" value={formData.harga_per_kg} onChange={(e) => setFormData({ ...formData, harga_per_kg: e.target.value })} required /></div>
             </div>
             <div className="space-y-2"><Label>Pengeluaran</Label><Input type="number" value={formData.pengeluaran} onChange={(e) => setFormData({ ...formData, pengeluaran: e.target.value })} min={0} /></div>
+            <div className="space-y-2"><Label>Keterangan</Label><Textarea placeholder="Keterangan tambahan (opsional)" value={formData.keterangan} onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })} rows={2} /></div>
 
             {/* Bubut Section */}
             <div className="rounded-md border border-purple-200 bg-purple-50/50 p-4 space-y-3">

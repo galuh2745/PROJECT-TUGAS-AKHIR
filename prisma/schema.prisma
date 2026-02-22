@@ -139,6 +139,7 @@ model BarangKeluarAyamHidup {
   harga_bubut     Decimal    @default(0.00) @db.Decimal(12, 2)
   total_penjualan Decimal    @db.Decimal(15, 2)
   pengeluaran     Decimal    @default(0.00) @db.Decimal(15, 2)
+  keterangan      String?    @db.Text
   total_bersih    Decimal    @default(0.00) @db.Decimal(15, 2)
   created_at      DateTime   @default(now())
   updated_at      DateTime   @updatedAt

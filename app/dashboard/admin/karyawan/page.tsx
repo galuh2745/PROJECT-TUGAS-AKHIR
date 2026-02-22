@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, Plus, Settings, Pencil, Trash2, X, Loader2, Search, RotateCcw
+  ArrowLeft, Plus, Settings, Pencil, Trash2, X, Loader2, Search, RotateCcw, Eye, EyeOff
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,6 +63,7 @@ export default function ManajemenKaryawanPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [formKaryawan, setFormKaryawan] = useState({
     nama: '', nip: '', password: '',
@@ -258,7 +259,12 @@ export default function ManajemenKaryawanPage() {
         <div className="space-y-2"><Label>NIP *</Label><Input value={formKaryawan.nip} onChange={(e) => setFormKaryawan({ ...formKaryawan, nip: e.target.value })} required /></div>
         <div className="space-y-2">
           <Label>{isEdit ? 'Password Baru' : 'Password *'}</Label>
-          <Input type="password" value={formKaryawan.password} onChange={(e) => setFormKaryawan({ ...formKaryawan, password: e.target.value })} placeholder={isEdit ? 'Kosongkan jika tidak diubah' : 'Minimal 6 karakter'} required={!isEdit} minLength={6} />
+          <div className="relative">
+            <Input type={showPassword ? 'text' : 'password'} value={formKaryawan.password} onChange={(e) => setFormKaryawan({ ...formKaryawan, password: e.target.value })} placeholder={isEdit ? 'Kosongkan jika tidak diubah' : 'Minimal 6 karakter'} required={!isEdit} minLength={6} className="pr-10" />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
         <div className="space-y-2">
           <Label>Jenis Karyawan *</Label>
