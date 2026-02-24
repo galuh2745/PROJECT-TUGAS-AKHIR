@@ -24,7 +24,13 @@ export default function MasterPerusahaanPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({ nama_perusahaan: '', alamat: '', kontak: '' });
 
-  useEffect(() => { fetchPerusahaan(); }, [search]);
+  useEffect(() => {
+  const delayDebounce = setTimeout(() => {
+    fetchPerusahaan();
+  }, 500); // delay 500ms
+
+  return () => clearTimeout(delayDebounce);
+}, [search]);
 
   const fetchPerusahaan = async () => {
     try {

@@ -45,10 +45,12 @@ const selectClass = 'flex h-9 w-full rounded-md border border-input bg-transpare
 
 export default function ManajemenKaryawanPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [karyawanList, setKaryawanList] = useState<Karyawan[]>([]);
   const [jenisKaryawanList, setJenisKaryawanList] = useState<JenisKaryawan[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterJenis, setFilterJenis] = useState('');
 
@@ -74,13 +76,15 @@ export default function ManajemenKaryawanPage() {
     nama_jenis: '', jam_masuk: '07:00', jam_pulang: '16:00', toleransi_terlambat: 15,
   });
 
-  const fetchData = async () => {
+  const fetchData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setInitialLoading(true);
+      else setRefreshing(true);
+
       let url = '/api/karyawan?';
       if (filterStatus) url += `status=${filterStatus}&`;
       if (filterJenis) url += `jenis_karyawan_id=${filterJenis}&`;
-      if (searchTerm) url += `search=${searchTerm}&`;
+      if (debouncedSearch) url += `search=${debouncedSearch}&`;
 
       const [karyawanRes, jenisRes] = await Promise.all([
         fetch(url, { credentials: 'include' }),
@@ -95,11 +99,21 @@ export default function ManajemenKaryawanPage() {
       if (karyawanData.success) setKaryawanList(karyawanData.data);
       if (jenisData.success) setJenisKaryawanList(jenisData.data);
     } catch { /* ignore */ } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, [filterStatus, filterJenis, searchTerm]);
+  useEffect(() => {
+  const timer = setTimeout(() => {
+    setDebouncedSearch(searchTerm);
+  }, 500); // delay 500ms
+
+  return () => clearTimeout(timer);
+}, [searchTerm]);
+
+  useEffect(() => { fetchData(true); }, []);
+  useEffect(() => { if (!initialLoading) fetchData(); }, [filterStatus, filterJenis, debouncedSearch]);
 
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
@@ -249,7 +263,7 @@ export default function ManajemenKaryawanPage() {
     setShowEditJenisModal(true);
   };
 
-  if (loading) return <LoadingSpinner text="Memuat data..." />;
+  if (initialLoading) return <LoadingSpinner text="Memuat data..." />;
 
   /* Helper: render karyawan form fields */
   const renderKaryawanForm = (onSubmit: (e: React.FormEvent) => void, isEdit?: boolean) => (
@@ -371,7 +385,10 @@ export default function ManajemenKaryawanPage() {
       {/* Karyawan Table */}
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Daftar Karyawan ({karyawanList.length})</CardTitle>
+          <CardTitle className="text-base">
+            Daftar Karyawan ({karyawanList.length})
+            {refreshing && <Loader2 className="w-4 h-4 ml-2 inline animate-spin text-muted-foreground" />}
+          </CardTitle>
           {selectedIds.size > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteMultiple} disabled={isDeleting}>
               {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
