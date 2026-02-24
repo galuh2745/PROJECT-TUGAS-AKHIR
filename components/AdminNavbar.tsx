@@ -25,6 +25,10 @@ const labelMap: Record<string, string> = {
   account: 'Akun',
   'reset-requests': 'Permintaan Reset',
   'change-password': 'Ubah Password',
+  penjualan: 'Penjualan',
+  draft: 'Transaksi Draft',
+  piutang: 'Piutang',
+  customer: 'Customer',
 };
 
 function getBreadcrumbs(pathname: string) {
@@ -63,6 +67,7 @@ export default function AdminNavbar() {
   const [todayDate, setTodayDate] = useState('');
   const [absenHariIni, setAbsenHariIni] = useState(0);
   const [resetRequests, setResetRequests] = useState(0);
+  const [draftCount, setDraftCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -73,9 +78,10 @@ export default function AdminNavbar() {
       try {
         const today = new Date();
         const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const [dashRes, resetRes] = await Promise.all([
+        const [dashRes, resetRes, draftRes] = await Promise.all([
           fetch(`/api/dashboard/admin?date=${dateStr}`, { credentials: 'include' }),
           fetch('/api/accounts/reset-requests/count', { credentials: 'include' }),
+          fetch('/api/penjualan/draft/count', { credentials: 'include' }),
         ]);
         if (dashRes.ok) {
           const json = await dashRes.json();
@@ -84,6 +90,10 @@ export default function AdminNavbar() {
         if (resetRes.ok) {
           const json = await resetRes.json();
           if (json.success) setResetRequests(json.count || 0);
+        }
+        if (draftRes.ok) {
+          const json = await draftRes.json();
+          if (json.success) setDraftCount(json.count || 0);
         }
       } catch { /* ignore */ }
     };
@@ -156,7 +166,7 @@ export default function AdminNavbar() {
               className="relative p-2 rounded-lg hover:bg-gray-100/80 transition-colors duration-150"
             >
               <Bell className="w-5 h-5 text-gray-500" />
-              {(absenHariIni > 0 || resetRequests > 0) && (
+              {(absenHariIni > 0 || resetRequests > 0 || draftCount > 0) && (
                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white" />
               )}
             </button>
@@ -166,6 +176,20 @@ export default function AdminNavbar() {
                   <p className="text-sm font-semibold text-gray-800">Notifikasi</p>
                 </div>
                 <div className="py-1">
+                  {draftCount > 0 && (
+                    <div
+                      className="flex items-start gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => { setNotifOpen(false); router.push('/dashboard/admin/penjualan/draft'); }}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-orange-600 text-xs font-bold">{draftCount}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Transaksi Draft</p>
+                        <p className="text-xs text-gray-400">{draftCount} transaksi belum dicetak</p>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-start gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
                       <span className="text-blue-600 text-xs font-bold">{absenHariIni}</span>
@@ -186,7 +210,7 @@ export default function AdminNavbar() {
                       </div>
                     </div>
                   )}
-                  {absenHariIni === 0 && resetRequests === 0 && (
+                  {absenHariIni === 0 && resetRequests === 0 && draftCount === 0 && (
                     <div className="px-3 py-4 text-center text-sm text-gray-400">Tidak ada notifikasi</div>
                   )}
                 </div>

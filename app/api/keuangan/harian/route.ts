@@ -44,49 +44,90 @@ export async function GET(req: Request) {
     const nextDate = new Date(dateParam);
     nextDate.setDate(nextDate.getDate() + 1);
 
-    // ==================== KAS MASUK (PEMASUKAN NYATA) ====================
+    // ==================== KAS MASUK (DARI TABEL PEMBAYARAN) ====================
+    // Semua kas masuk dihitung dari PembayaranPiutang, BUKAN dari Penjualan.jumlah_bayar
 
-    // 1. Penjualan hari ini (kas masuk = jumlah_bayar saat transaksi)
-    const penjualanHariIni = await prisma.penjualan.aggregate({
+    // Get all pembayaran hari ini with linked penjualan info
+    const pembayaranHariIniAll = await prisma.pembayaranPiutang.findMany({
       where: {
         tanggal: { gte: targetDate, lt: nextDate },
       },
-      _sum: { jumlah_bayar: true, grand_total: true, sisa_piutang: true },
+      include: {
+        penjualan: {
+          select: { jenis_transaksi: true, tanggal: true },
+        },
+        customer: { select: { nama: true } },
+      },
     });
 
-    // 1a. Breakdown by jenis_transaksi
+    // Breakdown kas masuk by jenis_transaksi
+    let kasMasukDaging = 0;
+    let kasMasukAyamHidup = 0;
+    let kasMasukCampuran = 0;
+    let kasMasukPelunasan = 0;
+
+    for (const p of pembayaranHariIniAll) {
+      const jumlah = parseFloat(p.jumlah_bayar.toString());
+      const jenis = p.penjualan?.jenis_transaksi || 'MANUAL';
+      const tanggalPenjualan = p.penjualan?.tanggal;
+
+      // Cek apakah ini pembayaran hari yang sama (penjualan baru) atau pelunasan piutang lama
+      const isSameDay = tanggalPenjualan &&
+        tanggalPenjualan.toISOString().split('T')[0] === dateParam;
+
+      if (isSameDay) {
+        // Pembayaran untuk penjualan hari ini
+        if (jenis === 'DAGING') kasMasukDaging += jumlah;
+        else if (jenis === 'AYAM_HIDUP') kasMasukAyamHidup += jumlah;
+        else if (jenis === 'CAMPURAN') kasMasukCampuran += jumlah;
+        else kasMasukDaging += jumlah; // fallback
+      } else {
+        // Pelunasan piutang dari hari sebelumnya
+        kasMasukPelunasan += jumlah;
+      }
+    }
+
+    const totalKasMasuk = kasMasukDaging + kasMasukAyamHidup + kasMasukCampuran + kasMasukPelunasan;
+
+    // Penjualan total hari ini (grand_total, untuk info)
+    const penjualanHariIni = await prisma.penjualan.aggregate({
+      where: {
+        tanggal: { gte: targetDate, lt: nextDate },
+        status: { not: 'draft' },
+      },
+      _sum: { grand_total: true, sisa_piutang: true },
+    });
+
     const penjualanDagingAgg = await prisma.penjualan.aggregate({
       where: {
         tanggal: { gte: targetDate, lt: nextDate },
         jenis_transaksi: 'DAGING',
+        status: { not: 'draft' },
       },
-      _sum: { jumlah_bayar: true, grand_total: true },
+      _sum: { grand_total: true },
     });
 
     const penjualanAyamHidupAgg = await prisma.penjualan.aggregate({
       where: {
         tanggal: { gte: targetDate, lt: nextDate },
         jenis_transaksi: 'AYAM_HIDUP',
+        status: { not: 'draft' },
       },
-      _sum: { jumlah_bayar: true, grand_total: true },
+      _sum: { grand_total: true },
     });
 
-    // 2. Pembayaran Piutang → kas masuk dari pelunasan hutang (FIFO)
-    const pembayaranPiutang = await prisma.pembayaranPiutang.aggregate({
+    const penjualanCampuranAgg = await prisma.penjualan.aggregate({
       where: {
         tanggal: { gte: targetDate, lt: nextDate },
+        jenis_transaksi: 'CAMPURAN',
+        status: { not: 'draft' },
       },
-      _sum: { jumlah_bayar: true },
+      _sum: { grand_total: true },
     });
 
-    const kasMasukDaging = parseFloat(penjualanDagingAgg._sum.jumlah_bayar?.toString() || '0');
-    const kasMasukAyamHidup = parseFloat(penjualanAyamHidupAgg._sum.jumlah_bayar?.toString() || '0');
-    const kasMasukPelunasan = parseFloat(pembayaranPiutang._sum.jumlah_bayar?.toString() || '0');
-    const totalKasMasuk = kasMasukDaging + kasMasukAyamHidup + kasMasukPelunasan;
-
-    // Penjualan total (grand_total = total - pengeluaran)
     const penjualanDagingTotal = parseFloat(penjualanDagingAgg._sum.grand_total?.toString() || '0');
     const penjualanAyamHidupTotal = parseFloat(penjualanAyamHidupAgg._sum.grand_total?.toString() || '0');
+    const penjualanCampuranTotal = parseFloat(penjualanCampuranAgg._sum.grand_total?.toString() || '0');
 
     // ==================== PENGELUARAN ====================
 
@@ -153,7 +194,10 @@ export async function GET(req: Request) {
 
     // Transaksi detail hari ini
     const transaksiHariIni = await prisma.penjualan.findMany({
-      where: { tanggal: { gte: targetDate, lt: nextDate } },
+      where: {
+        tanggal: { gte: targetDate, lt: nextDate },
+        status: { not: 'draft' },
+      },
       include: {
         customer: { select: { nama: true } },
       },
@@ -164,6 +208,7 @@ export async function GET(req: Request) {
       where: { tanggal: { gte: targetDate, lt: nextDate } },
       include: {
         customer: { select: { nama: true } },
+        penjualan: { select: { nomor_nota: true } },
       },
       orderBy: { created_at: 'desc' },
     });
@@ -175,13 +220,15 @@ export async function GET(req: Request) {
         pemasukan: {
           penjualan_daging: kasMasukDaging,
           penjualan_ayam_hidup: kasMasukAyamHidup,
+          penjualan_campuran: kasMasukCampuran,
           kas_masuk_pelunasan: kasMasukPelunasan,
           total: totalKasMasuk,
         },
         penjualan_hari_ini: {
           daging: penjualanDagingTotal,
           ayam_hidup: penjualanAyamHidupTotal,
-          total: penjualanDagingTotal + penjualanAyamHidupTotal,
+          campuran: penjualanCampuranTotal,
+          total: penjualanDagingTotal + penjualanAyamHidupTotal + penjualanCampuranTotal,
         },
         pengeluaran: {
           beli_ayam: totalBeliAyam,
@@ -209,6 +256,7 @@ export async function GET(req: Request) {
         detail_pembayaran: pembayaranHariIni.map((p) => ({
           id: p.id.toString(),
           customer_nama: p.customer.nama,
+          nomor_nota: p.penjualan?.nomor_nota || null,
           jumlah_bayar: parseFloat(p.jumlah_bayar.toString()),
           metode: p.metode,
           keterangan: p.keterangan,

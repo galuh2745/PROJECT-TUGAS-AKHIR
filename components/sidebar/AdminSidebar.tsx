@@ -27,10 +27,13 @@ import {
   UserCogIcon,
   KeyRoundIcon,
   LockIcon,
+  ShoppingCartIcon,
+  FileClockIcon,
+  HistoryIcon,
 } from './icons';
 
 // Menu groups configuration — logic unchanged
-const getAdminMenuGroups = (pendingCount: number = 0, resetRequestsCount: number = 0): MenuGroup[] => [
+const getAdminMenuGroups = (pendingCount: number = 0, resetRequestsCount: number = 0, draftCount: number = 0): MenuGroup[] => [
   {
     title: 'Menu Utama',
     items: [
@@ -129,7 +132,33 @@ const getAdminMenuGroups = (pendingCount: number = 0, resetRequestsCount: number
     ],
   },
   {
-    title: 'Penjualan & Piutang',
+    title: 'Penjualan',
+    items: [
+      {
+        id: 'penjualan',
+        label: 'Penjualan',
+        icon: <ShoppingCartIcon />,
+        badge: draftCount > 0 ? draftCount.toString() : undefined,
+        children: [
+          {
+            id: 'transaksi-draft',
+            label: 'Transaksi Draft',
+            href: '/dashboard/admin/penjualan/draft',
+            icon: <FileClockIcon className="w-4 h-4" />,
+            badge: draftCount > 0 ? draftCount.toString() : undefined,
+          },
+          {
+            id: 'riwayat-transaksi',
+            label: 'Riwayat Transaksi',
+            href: '/dashboard/admin/penjualan',
+            icon: <HistoryIcon className="w-4 h-4" />,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Piutang',
     items: [
       {
         id: 'customer',
@@ -190,14 +219,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ className = '' }) =>
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [resetRequestsCount, setResetRequestsCount] = useState(0);
+  const [draftCount, setDraftCount] = useState(0);
 
-  // Fetch pending izin/cuti count and reset requests count
+  // Fetch pending izin/cuti count, reset requests count, and draft count
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const [izinRes, resetRes] = await Promise.all([
+        const [izinRes, resetRes, draftRes] = await Promise.all([
           fetch('/api/izin-cuti/pending-count', { credentials: 'include' }),
           fetch('/api/accounts/reset-requests/count', { credentials: 'include' }),
+          fetch('/api/penjualan/draft/count', { credentials: 'include' }),
         ]);
         if (izinRes.ok) {
           const result = await izinRes.json();
@@ -206,6 +237,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ className = '' }) =>
         if (resetRes.ok) {
           const result = await resetRes.json();
           if (result.success) setResetRequestsCount(result.count);
+        }
+        if (draftRes.ok) {
+          const result = await draftRes.json();
+          if (result.success) setDraftCount(result.count);
         }
       } catch (error) {
         console.error('Error fetching counts:', error);
@@ -304,7 +339,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ className = '' }) =>
 
       {/* ── Menu Items ── */}
       <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-        <SidebarMenu groups={getAdminMenuGroups(pendingCount, resetRequestsCount)} isCollapsed={isCollapsed} />
+        <SidebarMenu groups={getAdminMenuGroups(pendingCount, resetRequestsCount, draftCount)} isCollapsed={isCollapsed} />
       </div>
 
       {/* ── Footer / Profile + Logout ── */}

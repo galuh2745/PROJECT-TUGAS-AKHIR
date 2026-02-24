@@ -290,7 +290,7 @@ model Customer {
 
 model Penjualan {
   id                BigInt   @id @default(autoincrement())
-  nomor_nota        String   @unique @db.VarChar(50)
+  nomor_nota        String?  @unique @db.VarChar(50)
   customer_id       BigInt
   tanggal           DateTime @db.Date
   jenis_transaksi   String   @default("MANUAL") @db.VarChar(20) // AYAM_HIDUP / DAGING / MANUAL
@@ -299,8 +299,9 @@ model Penjualan {
   grand_total       Decimal  @db.Decimal(15, 2)
   jumlah_bayar      Decimal  @default(0) @db.Decimal(15, 2)
   sisa_piutang      Decimal  @default(0) @db.Decimal(15, 2)
-  status            String   @default("hutang") @db.VarChar(20) // lunas / sebagian / hutang
-  metode_pembayaran String   @db.VarChar(20) // CASH / TRANSFER / CAMPUR
+  status            String   @default("draft") @db.VarChar(20) // draft / lunas / sebagian / hutang
+  status_cetak      Boolean  @default(false)
+  metode_pembayaran String?  @db.VarChar(20) // CASH / TRANSFER / CAMPUR
   keterangan        String?  @db.Text
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
@@ -308,15 +309,35 @@ model Penjualan {
   customer          Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   detail            PenjualanDetail[]
   pembayaran        PembayaranPiutang[]
+  pembayaran_log    PembayaranLog[]
 
   @@index([customer_id])
   @@index([tanggal])
   @@map("penjualan")
 }
 
+model PembayaranLog {
+  id            BigInt   @id @default(autoincrement())
+  penjualan_id  BigInt
+  total_lama    Decimal  @db.Decimal(15, 2)
+  bayar_lama    Decimal  @db.Decimal(15, 2)
+  sisa_lama     Decimal  @db.Decimal(15, 2)
+  bayar_baru    Decimal  @db.Decimal(15, 2)
+  sisa_baru     Decimal  @db.Decimal(15, 2)
+  alasan        String   @db.Text
+  diubah_oleh   String   @db.VarChar(255)
+  created_at    DateTime @default(now())
+
+  penjualan     Penjualan @relation(fields: [penjualan_id], references: [id], onDelete: Cascade)
+
+  @@index([penjualan_id])
+  @@map("pembayaran_log")
+}
+
 model PenjualanDetail {
   id              BigInt    @id @default(autoincrement())
   penjualan_id    BigInt
+  tipe            String?   @db.VarChar(20)  // ayam_hidup | daging
   jenis_daging    String?   @db.VarChar(100)
   ekor            Int?
   berat           Decimal   @db.Decimal(10, 2)

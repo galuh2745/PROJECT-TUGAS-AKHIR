@@ -29,6 +29,7 @@ import { StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 interface PemasukanDetail {
   penjualan_daging: number;
   penjualan_ayam_hidup: number;
+  penjualan_campuran?: number;
   kas_masuk_penjualan?: number;
   kas_masuk_pelunasan?: number;
   total: number;
@@ -171,6 +172,12 @@ function SummaryCards({
                 <span>Penjualan Ayam Hidup</span>
                 <span className="font-medium">{formatRupiah(pemasukan.penjualan_ayam_hidup)}</span>
               </div>
+              {(pemasukan.penjualan_campuran !== undefined && pemasukan.penjualan_campuran > 0) && (
+                <div className="flex justify-between">
+                  <span>Penjualan Campuran</span>
+                  <span className="font-medium">{formatRupiah(pemasukan.penjualan_campuran)}</span>
+                </div>
+              )}
               {(pemasukan.kas_masuk_penjualan !== undefined && pemasukan.kas_masuk_penjualan > 0) && (
                 <div className="flex justify-between">
                   <span>Kas Masuk Penjualan</span>

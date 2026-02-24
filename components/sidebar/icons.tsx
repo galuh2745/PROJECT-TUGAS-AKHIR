@@ -6,7 +6,7 @@ import {
   PackageMinus, TrendingUp, TrendingDown, BarChart3, FileText as FileTextLucide,
   Skull, Building2, Bird, Warehouse, Wallet, UserRound, ReceiptText,
   UserCog, KeyRound, Lock, AlertTriangle, ArrowDownCircle, ArrowUpCircle,
-  UtensilsCrossed
+  UtensilsCrossed, ShoppingCart, FileClock
 } from 'lucide-react';
 
 interface IconProps {
@@ -55,3 +55,5 @@ export const UserCogIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => <
 export const KeyRoundIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => <KeyRound className={className} />;
 export const LockIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => <Lock className={className} />;
 export const UtensilsCrossedIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => <UtensilsCrossed className={className} />;
+export const ShoppingCartIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => <ShoppingCart className={className} />;
+export const FileClockIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => <FileClock className={className} />;
