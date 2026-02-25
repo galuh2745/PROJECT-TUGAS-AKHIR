@@ -110,10 +110,12 @@ export default function UserSidebar() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 h-full z-50
+          fixed lg:static inset-y-0 left-0 z-50
           ${isCollapsed ? 'w-20' : 'w-65'}
           bg-white shadow-xl rounded-r-2xl border-r border-gray-100
-          transition-all duration-300 ease-in-out
+          flex flex-col
+          transform transition-all duration-300 ease-in-out
+          lg:transform-none
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >

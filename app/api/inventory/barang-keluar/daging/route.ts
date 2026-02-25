@@ -126,8 +126,11 @@ export async function GET(req: Request) {
       // Find linked penjualan for piutang info
       const linkedPenjualan = await prisma.penjualan.findFirst({
         where: {
-          keterangan: { contains: `Barang Keluar Daging #${bk.id}` },
-          jenis_transaksi: 'DAGING',
+          OR: [
+            { keterangan: { contains: `Barang Keluar Daging #${bk.id}` } },
+            { keterangan: { contains: `BK Daging #${bk.id}` } },
+          ],
+          jenis_transaksi: { in: ['DAGING', 'CAMPURAN'] },
         },
         select: {
           id: true,
@@ -149,10 +152,10 @@ export async function GET(req: Request) {
         keterangan: bk.keterangan,
         // Piutang info from linked penjualan
         nomor_nota: linkedPenjualan?.nomor_nota || null,
-        jumlah_bayar: linkedPenjualan ? parseFloat(linkedPenjualan.jumlah_bayar.toString()) : parseFloat(bk.total_penjualan.toString()),
-        sisa_piutang: linkedPenjualan ? parseFloat(linkedPenjualan.sisa_piutang.toString()) : 0,
-        grand_total: linkedPenjualan ? parseFloat(linkedPenjualan.grand_total.toString()) : parseFloat(bk.saldo.toString()),
-        status_piutang: linkedPenjualan?.status || 'lunas',
+        jumlah_bayar: linkedPenjualan ? parseFloat(linkedPenjualan.jumlah_bayar.toString()) : 0,
+        sisa_piutang: linkedPenjualan ? parseFloat(linkedPenjualan.sisa_piutang.toString()) : parseFloat(bk.total_penjualan.toString()),
+        grand_total: linkedPenjualan ? parseFloat(linkedPenjualan.grand_total.toString()) : parseFloat(bk.total_penjualan.toString()),
+        status_piutang: linkedPenjualan?.status || 'hutang',
         created_at: bk.created_at.toISOString(),
         details: bk.details.map((d) => ({
           id: d.id.toString(),

@@ -90,7 +90,7 @@ export default function BarangKeluarDagingPage() {
   const summary = useMemo(() => ({
     totalPenjualan: data.reduce((s, d) => s + d.total_penjualan, 0),
     totalPengeluaran: data.reduce((s, d) => s + d.pengeluaran, 0),
-    totalSaldo: data.reduce((s, d) => s + d.saldo, 0),
+    totalSaldo: data.reduce((s, d) => s + (d.status_piutang === 'lunas' ? d.saldo : 0), 0),
   }), [data]);
 
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());

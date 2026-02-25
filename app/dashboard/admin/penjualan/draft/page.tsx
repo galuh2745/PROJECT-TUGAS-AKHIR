@@ -6,11 +6,9 @@ import { toast } from 'sonner';
 import { FileText, RefreshCw, CheckCircle, Eye, Package, Printer, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Badge } from '@/components/ui/badge';
 import { StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
@@ -59,10 +57,6 @@ export default function DraftPenjualanPage() {
   const [cetakSekarang, setCetakSekarang] = useState(true);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [finalisasiResult, setFinalisasiResult] = useState<{ nomorNota: string; penjualanId: string; status: string } | null>(null);
-  const [formData, setFormData] = useState({
-    jumlah_bayar: '',
-    metode_pembayaran: 'CASH',
-  });
 
   const fetchDrafts = useCallback(async () => {
     try {
@@ -78,7 +72,6 @@ export default function DraftPenjualanPage() {
 
   const openFinalisasi = (draft: DraftPenjualan) => {
     setSelectedDraft(draft);
-    setFormData({ jumlah_bayar: '', metode_pembayaran: 'CASH' });
     setCetakSekarang(true);
     setShowFinalisasi(true);
   };
@@ -88,15 +81,11 @@ export default function DraftPenjualanPage() {
     if (!selectedDraft) return;
     setSubmitting(true);
     try {
-      const bayar = parseFloat(formData.jumlah_bayar || '0');
       const res = await fetch(`/api/penjualan/${selectedDraft.id}/finalisasi`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          jumlah_bayar: bayar,
-          metode_pembayaran: formData.metode_pembayaran,
-        }),
+        body: JSON.stringify({}),
       });
       const json = await res.json();
       if (json.success) {
@@ -122,18 +111,6 @@ export default function DraftPenjualanPage() {
       }
     } catch { toast.error('Terjadi kesalahan'); } finally { setSubmitting(false); }
   };
-
-  const bayarValue = parseFloat(formData.jumlah_bayar || '0');
-  const sisaPiutangCalc = selectedDraft ? selectedDraft.grand_total - bayarValue : 0;
-
-  const getStatusPreview = (): { label: string; color: string } => {
-    if (!selectedDraft) return { label: '-', color: 'text-gray-500' };
-    if (bayarValue <= 0) return { label: 'HUTANG', color: 'text-red-600' };
-    if (sisaPiutangCalc <= 0) return { label: 'LUNAS', color: 'text-emerald-600' };
-    return { label: 'SEBAGIAN', color: 'text-orange-600' };
-  };
-
-  const statusPreview = getStatusPreview();
 
   const totalDrafts = drafts.length;
   const totalNilai = drafts.reduce((s, d) => s + d.grand_total, 0);
@@ -162,8 +139,8 @@ export default function DraftPenjualanPage() {
               <ol className="list-decimal list-inside space-y-0.5">
                 <li>Input barang keluar di <strong>Inventory → Barang Keluar</strong></li>
                 <li>Draft transaksi otomatis muncul disini</li>
-                <li>Finalisasi & tentukan pembayaran (boleh Rp 0 jika belum bayar)</li>
-                <li>Jika ada koreksi, edit di <strong>Riwayat Transaksi → Detail → Edit Pembayaran</strong></li>
+                <li>Finalisasi & cetak nota untuk menghasilkan nomor nota</li>
+                <li>Pembayaran dilakukan melalui menu <strong>Piutang</strong></li>
               </ol>
             </div>
           </div>
@@ -319,59 +296,15 @@ export default function DraftPenjualanPage() {
                 </div>
               </div>
 
-              {/* Jumlah Bayar */}
-              <div className="space-y-2">
-                <Label>Jumlah Bayar</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={formData.jumlah_bayar}
-                  onChange={(e) => setFormData({ ...formData, jumlah_bayar: e.target.value })}
-                  placeholder="Ketik 0 jika belum bayar"
-                />
-                <p className="text-xs text-muted-foreground">
-                  💡 Boleh Rp 0 jika customer belum bayar. Bisa diedit nanti di Riwayat Transaksi.
+              {/* Info piutang */}
+              <div className="p-3 rounded-md border text-sm space-y-1 bg-amber-50 border-amber-200">
+                <div className="flex justify-between">
+                  <span>Status setelah finalisasi:</span>
+                  <span className="font-bold text-amber-700">PIUTANG</span>
+                </div>
+                <p className="text-xs text-amber-600 mt-1">
+                  💰 Seluruh nominal menjadi piutang. Pelunasan dilakukan melalui menu <strong>Piutang</strong>.
                 </p>
-              </div>
-
-              {/* Live Preview Sisa Piutang + Status */}
-              <div className={`p-3 rounded-md border text-sm space-y-1 ${
-                sisaPiutangCalc > 0 ? 'bg-red-50 border-red-200' :
-                sisaPiutangCalc === 0 ? 'bg-emerald-50 border-emerald-200' :
-                'bg-gray-50 border-gray-200'
-              }`}>
-                <div className="flex justify-between">
-                  <span>Bayar:</span>
-                  <span className="font-medium">{formatRupiah(bayarValue)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Sisa Piutang:</span>
-                  <span className={`font-bold ${sisaPiutangCalc > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {sisaPiutangCalc <= 0 ? 'Rp 0 (LUNAS)' : formatRupiah(sisaPiutangCalc)}
-                  </span>
-                </div>
-                <div className="flex justify-between border-t pt-1">
-                  <span>Status:</span>
-                  <span className={`font-bold ${statusPreview.color}`}>
-                    {statusPreview.label}
-                  </span>
-                </div>
-              </div>
-
-              {/* Metode Pembayaran */}
-              <div className="space-y-2">
-                <Label>Metode Pembayaran</Label>
-                <Select value={formData.metode_pembayaran} onValueChange={(v) => setFormData({ ...formData, metode_pembayaran: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CASH">Cash</SelectItem>
-                    <SelectItem value="TRANSFER">Transfer</SelectItem>
-                    <SelectItem value="CAMPUR">Campur</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               {/* Cetak Sekarang Toggle */}
@@ -434,9 +367,9 @@ export default function DraftPenjualanPage() {
               </div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
-                <p className="font-medium">💡 Perlu koreksi pembayaran?</p>
+                <p className="font-medium">� Perlu melakukan pembayaran?</p>
                 <p className="text-xs mt-1">
-                  Buka <strong>Riwayat Transaksi → Detail → Edit Pembayaran</strong> untuk mengubah jumlah bayar kapanpun.
+                  Buka menu <strong>Piutang</strong> untuk melakukan pelunasan nota.
                 </p>
               </div>
 

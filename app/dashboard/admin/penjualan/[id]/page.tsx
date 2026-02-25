@@ -6,23 +6,16 @@ import { toast } from 'sonner';
 import {
   ArrowLeft,
   Printer,
-  Edit3,
   Clock,
   FileText,
   User,
   Calendar,
   CreditCard,
-  AlertTriangle,
   History,
-  RefreshCw,
   Wallet,
-  ExternalLink,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -32,15 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface PenjualanDetail {
   id: string;
@@ -136,13 +121,6 @@ export default function DetailPenjualanPage() {
 
   const [data, setData] = useState<PenjualanData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showWarningPiutang, setShowWarningPiutang] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [tambahBayar, setTambahBayar] = useState('');
-  const [metodeBayar, setMetodeBayar] = useState('CASH');
-  const [alasan, setAlasan] = useState('');
-
   const fetchDetail = useCallback(async () => {
     try {
       setLoading(true);
@@ -166,74 +144,10 @@ export default function DetailPenjualanPage() {
     fetchDetail();
   }, [fetchDetail]);
 
-  const openEditModal = () => {
-    if (data) {
-      // Show warning dialog if there's outstanding piutang
-      if (data.sisa_piutang > 0) {
-        setShowWarningPiutang(true);
-        return;
-      }
-      setTambahBayar('');
-      setMetodeBayar('CASH');
-      setAlasan('');
-      setShowEditModal(true);
-    }
-  };
-
-  const proceedEditFromWarning = () => {
-    setShowWarningPiutang(false);
-    setTambahBayar('');
-    setMetodeBayar('CASH');
-    setAlasan('');
-    setShowEditModal(true);
-  };
-
-  const handleEditPembayaran = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!alasan.trim()) {
-      toast.error('Alasan perubahan wajib diisi');
-      return;
-    }
-    const tambahVal = parseFloat(tambahBayar || '0');
-    if (tambahVal <= 0) {
-      toast.error('Jumlah tambahan pembayaran harus lebih dari 0');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const res = await fetch(`/api/penjualan/${id}/edit-pembayaran`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          tambah_bayar: tambahVal,
-          metode: metodeBayar,
-          alasan: alasan.trim(),
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('Pembayaran berhasil ditambahkan');
-        setShowEditModal(false);
-        fetchDetail();
-      } else {
-        toast.error(json.error || 'Gagal menambah pembayaran');
-      }
-    } catch {
-      toast.error('Terjadi kesalahan');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleCetakNota = () => {
     window.open(`/penjualan/${id}/print`, '_blank');
   };
 
-  const tambahVal = parseFloat(tambahBayar || '0');
-  const sisaPreview =
-    data ? Math.max(0, data.sisa_piutang - tambahVal) : 0;
   const isRevisi = data && data.pembayaran && data.pembayaran.length > 1;
 
   if (loading) {
@@ -292,9 +206,11 @@ export default function DetailPenjualanPage() {
             <Printer className="w-4 h-4 mr-2" />
             {isRevisi ? 'Cetak Ulang' : 'Cetak Nota'}
           </Button>
-          <Button onClick={openEditModal} disabled={data.status === 'lunas'}>
-            <Edit3 className="w-4 h-4 mr-2" /> {data.sisa_piutang > 0 ? 'Tambah Pembayaran' : 'Edit Pembayaran'}
-          </Button>
+          {data.sisa_piutang > 0 && (
+            <Button onClick={() => router.push('/dashboard/admin/piutang')}>
+              <Wallet className="w-4 h-4 mr-2" /> Ke Piutang
+            </Button>
+          )}
         </div>
       </div>
 
@@ -564,163 +480,6 @@ export default function DetailPenjualanPage() {
         </Card>
       )}
 
-      {/* ========== Dialog Warning Piutang ========== */}
-      <Dialog open={showWarningPiutang} onOpenChange={setShowWarningPiutang}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="w-5 h-5" /> Pelunasan Sebaiknya dari Menu Piutang
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-              <p>Transaksi ini masih memiliki sisa piutang sebesar <strong>{formatRupiah(data.sisa_piutang)}</strong>.</p>
-              <p className="mt-2">Disarankan melakukan pelunasan melalui:</p>
-              <p className="mt-1 font-semibold">💰 Keuangan → Piutang</p>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowWarningPiutang(false);
-                  router.push('/dashboard/admin/piutang');
-                }}
-              >
-                <ExternalLink className="w-4 h-4 mr-2" /> Buka Piutang
-              </Button>
-              <Button
-                onClick={proceedEditFromWarning}
-              >
-                Lanjutkan Dari Sini
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ========== Modal Tambah Pembayaran ========== */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Edit3 className="w-5 h-5" /> Tambah Pembayaran
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleEditPembayaran} className="space-y-4">
-            <div className="p-3 bg-gray-50 rounded-md space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">No. Nota</span>
-                <span className="font-medium">{data.nomor_nota}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Customer</span>
-                <span className="font-medium">{data.customer.nama}</span>
-              </div>
-              <div className="flex justify-between text-sm border-t pt-1">
-                <span className="text-muted-foreground">Grand Total</span>
-                <span className="font-medium">{formatRupiah(data.grand_total)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Sudah Dibayar</span>
-                <span className="font-medium text-emerald-600">{formatRupiah(data.jumlah_bayar)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-bold">
-                <span className="text-red-600">Sisa Piutang</span>
-                <span className="text-red-600">{formatRupiah(data.sisa_piutang)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tambahan Pembayaran *</Label>
-              <Input
-                type="number"
-                min="1"
-                step="1"
-                max={data.sisa_piutang}
-                value={tambahBayar}
-                onChange={(e) => setTambahBayar(e.target.value)}
-                placeholder={`Maks ${formatRupiah(data.sisa_piutang)}`}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Masukkan jumlah tambahan, bukan total keseluruhan.
-              </p>
-            </div>
-
-            {/* Metode Pembayaran */}
-            <div className="space-y-2">
-              <Label>Metode Pembayaran *</Label>
-              <Select value={metodeBayar} onValueChange={setMetodeBayar}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CASH">Cash</SelectItem>
-                  <SelectItem value="TRANSFER">Transfer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Preview Sisa */}
-            {tambahBayar && (
-              <div
-                className={`p-3 rounded-md border text-sm ${
-                  sisaPreview > 0
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-emerald-50 border-emerald-200'
-                }`}
-              >
-                <div className="flex justify-between">
-                  <span>Sisa Piutang Setelah Bayar:</span>
-                  <span
-                    className={`font-bold ${
-                      sisaPreview > 0
-                        ? 'text-red-600'
-                        : 'text-emerald-600'
-                    }`}
-                  >
-                    {sisaPreview > 0 ? formatRupiah(sisaPreview) : 'LUNAS'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 text-amber-500" />
-                Alasan / Keterangan *
-              </Label>
-              <Textarea
-                value={alasan}
-                onChange={(e) => setAlasan(e.target.value)}
-                rows={3}
-                placeholder="Jelaskan alasan pembayaran tambahan..."
-                required
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowEditModal(false)}
-              >
-                Batal
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Menyimpan...
-                  </>
-                ) : (
-                  'Tambah Pembayaran'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

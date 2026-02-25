@@ -16,7 +16,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
       <UserSidebar />
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-64 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0">
         {/* Mobile header spacing */}
         <div className="lg:hidden h-14" />
 

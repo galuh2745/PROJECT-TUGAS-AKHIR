@@ -91,7 +91,7 @@ export default function BarangKeluarAyamHidupPage() {
     totalKg: data.reduce((s, d) => s + d.total_kg, 0),
     totalPenjualan: data.reduce((s, d) => s + d.total_penjualan, 0),
     totalPengeluaran: data.reduce((s, d) => s + d.pengeluaran, 0),
-    totalBersih: data.reduce((s, d) => s + d.total_bersih, 0),
+    totalBersih: data.reduce((s, d) => s + (d.status_piutang === 'lunas' ? d.total_bersih : 0), 0),
   }), [data]);
 
   const handleSubmit = async (e: React.FormEvent) => {

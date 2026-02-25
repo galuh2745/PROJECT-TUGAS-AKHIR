@@ -49,7 +49,7 @@ export default function ResetRequestsPage() {
     try {
       const response = await fetch('/api/accounts/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ userId: selectedUser.id, newPassword }) });
       const result = await response.json();
-      if (result.success) { toast.success(`Password untuk ${selectedUser.username} berhasil direset`); setShowResetModal(false); setNewPassword(''); setSelectedUser(null); fetchRequests(); }
+      if (result.success) { toast.success(`Password untuk ${selectedUser.karyawan?.nama || selectedUser.username} berhasil direset`); setShowResetModal(false); setNewPassword(''); setSelectedUser(null); fetchRequests(); }
       else toast.error(result.error || 'Gagal mereset password');
     } catch { toast.error('Terjadi kesalahan'); } finally { setProcessing(null); }
   };
@@ -60,7 +60,7 @@ export default function ResetRequestsPage() {
     try {
       const response = await fetch('/api/accounts/reset-requests/reject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ userId: request.id }) });
       const result = await response.json();
-      if (result.success) { toast.success('Permintaan reset password ditolak'); fetchRequests(); }
+      if (result.success) { toast.success(`Permintaan reset password dari ${request.karyawan?.nama || request.username} ditolak`); fetchRequests(); }
       else toast.error(result.error || 'Gagal menolak permintaan');
     } catch { toast.error('Terjadi kesalahan'); } finally { setProcessing(null); }
   };

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Search, ShoppingCart, RefreshCw, Eye, Printer } from 'lucide-react';
+import { Search, ShoppingCart, RefreshCw, Printer } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -192,9 +192,6 @@ export default function PenjualanPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1 justify-center" onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push(`/dashboard/admin/penjualan/${p.id}`)} title="Detail">
-                              <Eye className="w-4 h-4" />
-                            </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open(`/penjualan/${p.id}/print`, '_blank')} title="Cetak Nota">
                               <Printer className="w-4 h-4" />
                             </Button>

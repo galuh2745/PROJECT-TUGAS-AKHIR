@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { jwtVerify } from 'jose';
 import { Decimal } from '@prisma/client/runtime/library';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 async function validateAdmin() {
   const cookieStore = await cookies();
@@ -41,14 +41,7 @@ async function generateNomorNota(tanggal: Date, tx: Prisma.TransactionClient): P
   return `${prefix}${String(nextNumber).padStart(3, '0')}`;
 }
 
-function computeStatus(grandTotal: number, jumlahBayar: number): string {
-  const sisa = grandTotal - jumlahBayar;
-  if (sisa <= 0) return 'lunas';
-  if (jumlahBayar > 0) return 'sebagian';
-  return 'hutang';
-}
-
-// POST: Finalisasi draft → generate nota, set payment, mark as printed
+// POST: Finalisasi draft → generate nota, always hutang (pelunasan via Piutang page)
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -60,15 +53,6 @@ export async function POST(
     }
 
     const { id } = await params;
-    const body = await req.json();
-    const { jumlah_bayar, metode_pembayaran } = body;
-
-    if (jumlah_bayar === undefined || jumlah_bayar === null) {
-      return NextResponse.json({ success: false, error: 'Jumlah bayar wajib diisi' }, { status: 400 });
-    }
-    if (!metode_pembayaran) {
-      return NextResponse.json({ success: false, error: 'Metode pembayaran wajib dipilih' }, { status: 400 });
-    }
 
     const penjualan = await prisma.penjualan.findUnique({
       where: { id: BigInt(id) },
@@ -84,17 +68,6 @@ export async function POST(
     }
 
     const grandTotal = parseFloat(penjualan.grand_total.toString());
-    const bayar = parseFloat(jumlah_bayar);
-
-    if (bayar < 0) {
-      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh negatif' }, { status: 400 });
-    }
-    if (bayar > grandTotal) {
-      return NextResponse.json({ success: false, error: 'Jumlah bayar tidak boleh melebihi grand total' }, { status: 400 });
-    }
-
-    const sisaPiutang = Math.max(0, grandTotal - bayar);
-    const statusVal = computeStatus(grandTotal, bayar);
 
     const result = await prisma.$transaction(async (tx) => {
       const nomorNota = await generateNomorNota(penjualan.tanggal, tx);
@@ -103,27 +76,13 @@ export async function POST(
         where: { id: BigInt(id) },
         data: {
           nomor_nota: nomorNota,
-          jumlah_bayar: new Decimal(bayar.toFixed(2)),
-          sisa_piutang: new Decimal(sisaPiutang.toFixed(2)),
-          status: statusVal,
+          jumlah_bayar: new Decimal('0'),
+          sisa_piutang: new Decimal(grandTotal.toFixed(2)),
+          status: 'hutang',
           status_cetak: true,
-          metode_pembayaran: metode_pembayaran,
+          metode_pembayaran: 'BELUM_BAYAR',
         },
       });
-
-      // Create PembayaranPiutang record if bayar > 0
-      if (bayar > 0) {
-        await tx.pembayaranPiutang.create({
-          data: {
-            customer_id: penjualan.customer_id,
-            penjualan_id: BigInt(id),
-            tanggal: penjualan.tanggal,
-            jumlah_bayar: new Decimal(bayar.toFixed(2)),
-            metode: metode_pembayaran,
-            keterangan: `Pembayaran awal saat finalisasi nota ${nomorNota}`,
-          },
-        });
-      }
 
       return updated;
     });
@@ -135,7 +94,7 @@ export async function POST(
         id: result.id.toString(),
         nomor_nota: result.nomor_nota,
         grand_total: parseFloat(result.grand_total.toString()),
-        jumlah_bayar: parseFloat(result.jumlah_bayar.toString()),
+        jumlah_bayar: 0,
         sisa_piutang: parseFloat(result.sisa_piutang.toString()),
         status: result.status,
       },
