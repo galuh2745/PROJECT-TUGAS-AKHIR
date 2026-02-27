@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Sistem Absensi Karyawan - CV Aswi Sentosa',
   description: 'Sistem Manajemen Absensi, Izin, Cuti, dan Lembur Karyawan',
+  icons: {
+    icon: '/images/logo/logocvaswihd.png',
+  },
 };
 
 export default function RootLayout({
