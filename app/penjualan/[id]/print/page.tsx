@@ -67,7 +67,7 @@ const padLeft = (str: string, len: number): string => {
   return ' '.repeat(len - str.length) + str;
 };
 
-const LINE_WIDTH = 52;
+const LINE_WIDTH = 76;
 const SEPARATOR = '='.repeat(LINE_WIDTH);
 const DASH_LINE = '-'.repeat(LINE_WIDTH);
 
@@ -150,31 +150,27 @@ export default function PrintNotaPage() {
     const itemName = d.jenis_daging || 'Ayam Hidup';
     
     if (d.ekor && d.ekor > 0) {
-      // Ayam hidup: show ekor line + berat line
       const ekorStr = `${d.ekor} ek`;
       const hargaStr = formatRupiah(d.harga);
       const subtotalStr = formatRupiah(d.subtotal);
-      // Item line: NAME              QTY ek   HARGA    SUBTOTAL
       const line =
-        padRight(itemName, 20) +
-        padLeft(ekorStr, 8) +
-        padLeft(hargaStr, 12) +
-        padLeft(subtotalStr, 12);
+        padRight(itemName, 28) +
+        padLeft(ekorStr, 12) +
+        padLeft(hargaStr, 18) +
+        padLeft(subtotalStr, 18);
       detailLines.push(line);
-      // Berat line
       const beratLine =
-        padRight('  Berat', 20) + padLeft(`${d.berat.toLocaleString('id-ID')} kg`, 8);
+        padRight('  Berat', 28) + padLeft(`${d.berat.toLocaleString('id-ID')} kg`, 12);
       detailLines.push(beratLine);
     } else {
-      // Daging: NAME          BERAT kg   HARGA    SUBTOTAL
       const beratStr = `${d.berat.toLocaleString('id-ID')} kg`;
       const hargaStr = formatRupiah(d.harga);
       const subtotalStr = formatRupiah(d.subtotal);
       const line =
-        padRight(itemName, 20) +
-        padLeft(beratStr, 8) +
-        padLeft(hargaStr, 12) +
-        padLeft(subtotalStr, 12);
+        padRight(itemName, 28) +
+        padLeft(beratStr, 12) +
+        padLeft(hargaStr, 18) +
+        padLeft(subtotalStr, 18);
       detailLines.push(line);
     }
   });
@@ -190,13 +186,13 @@ export default function PrintNotaPage() {
           __html: `
             @media print {
               @page {
-                margin: 5mm;
-                size: auto;
+                size: 241.3mm 279.4mm;
+                margin: 8mm 10mm;
               }
               body {
                 font-family: 'Courier New', Courier, monospace !important;
-                font-size: 11px !important;
-                line-height: 1.4 !important;
+                font-size: 16px !important;
+                line-height: 1.8 !important;
                 color: #000 !important;
                 background: #fff !important;
                 margin: 0 !important;
@@ -205,21 +201,32 @@ export default function PrintNotaPage() {
               .no-print {
                 display: none !important;
               }
+              .nota-wrapper {
+                width: 100% !important;
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
             }
             body {
               font-family: 'Courier New', Courier, monospace;
-              font-size: 12px;
-              line-height: 1.5;
+              font-size: 16px;
+              line-height: 1.8;
               color: #000;
-              background: #fff;
+              background: #f5f5f5;
               margin: 0;
               padding: 20px;
             }
             .nota-wrapper {
-              max-width: 600px;
+              width: 241.3mm;
+              max-width: 100%;
               margin: 0 auto;
+              padding: 12mm 14mm;
               white-space: pre;
               word-wrap: break-word;
+              background: #fff;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              box-sizing: border-box;
             }
             .nota-line {
               margin: 0;
@@ -264,10 +271,10 @@ export default function PrintNotaPage() {
         {isRevisi && (
           <>
             <pre className="nota-line revisi-header">
-              {'        *** NOTA REVISI ***'}
+              {'                    *** NOTA REVISI ***'}
             </pre>
             <pre className="nota-line">
-              {'   Revisi pada: ' + formatWaktu(data.updated_at)}
+              {'         Revisi pada: ' + formatWaktu(data.updated_at)}
             </pre>
             <pre className="nota-line">{' '}</pre>
           </>
@@ -276,18 +283,16 @@ export default function PrintNotaPage() {
         {!isRevisi && isReprint && (
           <>
             <pre className="nota-line revisi-header">
-              {'         *** CETAK ULANG ***'}
+              {'                                         *** CETAK ULANG ***'}
             </pre>
             <pre className="nota-line">{' '}</pre>
           </>
         )}
 
         <pre className="nota-line">
-          {'              CV ASWI SENTOSA'}
+          {'                              CV ASWI SENTOSA LAMPUNG'}
         </pre>
-        <pre className="nota-line">
-          {'                 LAMPUNG'}
-        </pre>
+        
         <pre className="nota-line">{DASH_LINE}</pre>
         <pre className="nota-line">
           {'Tanggal  : ' + formatTanggal(data.tanggal)}
@@ -301,10 +306,10 @@ export default function PrintNotaPage() {
         <pre className="nota-line">{DASH_LINE}</pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">
-          {padRight('ITEM', 20) +
-            padLeft('QTY', 8) +
-            padLeft('HARGA', 12) +
-            padLeft('TOTAL', 12)}
+          {padRight('ITEM', 28) +
+            padLeft('QTY', 12) +
+            padLeft('HARGA', 18) +
+            padLeft('TOTAL', 18)}
         </pre>
         <pre className="nota-line">{DASH_LINE}</pre>
 
@@ -316,21 +321,21 @@ export default function PrintNotaPage() {
 
         <pre className="nota-line">{DASH_LINE}</pre>
         <pre className="nota-line">
-          {padRight('TOTAL', 28) + padLeft(totalStr, 24)}
+          {padRight('TOTAL', 40) + padLeft(totalStr, 36)}
         </pre>
         <pre className="nota-line">
-          {padRight('Bayar', 28) + padLeft(bayarStr, 24)}
+          {padRight('Bayar', 40) + padLeft(bayarStr, 36)}
         </pre>
         <pre className="nota-line">
-          {padRight('Sisa', 28) + padLeft(sisaStr, 24)}
+          {padRight('Sisa', 40) + padLeft(sisaStr, 36)}
         </pre>
         <pre className="nota-line">
-          {padRight('Status', 28) + padLeft(data.status.toUpperCase(), 24)}
+          {padRight('Status', 40) + padLeft(data.status.toUpperCase(), 36)}
         </pre>
         <pre className="nota-line">{DASH_LINE}</pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">
-          {'    Terima kasih atas kepercayaannya'}
+          {'                     Terima kasih atas kepercayaannya'}
         </pre>
         <pre className="nota-line">{SEPARATOR}</pre>
       </div>

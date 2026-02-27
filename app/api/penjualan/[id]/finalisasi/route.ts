@@ -20,11 +20,12 @@ async function validateAdmin() {
   return { role, userId };
 }
 
-// Generate INV-YYYYMM-XXX format
+// Generate NOTA-YYYYMMDDASL-XXX format
 async function generateNomorNota(tanggal: Date, tx: Prisma.TransactionClient): Promise<string> {
   const year = tanggal.getFullYear();
   const month = String(tanggal.getMonth() + 1).padStart(2, '0');
-  const prefix = `INV-${year}${month}-`;
+  const day = String(tanggal.getDate()).padStart(2, '0');
+  const prefix = `NOTA-${year}${month}${day}ASL-`;
 
   const lastNota = await tx.penjualan.findFirst({
     where: { nomor_nota: { startsWith: prefix } },
