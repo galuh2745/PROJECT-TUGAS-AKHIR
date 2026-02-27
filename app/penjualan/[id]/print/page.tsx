@@ -187,12 +187,12 @@ export default function PrintNotaPage() {
             @media print {
               @page {
                 size: 241.3mm 279.4mm;
-                margin: 8mm 10mm;
+                margin: 12mm 15mm 10mm 15mm;
               }
               body {
                 font-family: 'Courier New', Courier, monospace !important;
-                font-size: 16px !important;
-                line-height: 1.8 !important;
+                font-size: 14px !important;
+                line-height: 1.6 !important;
                 color: #000 !important;
                 background: #fff !important;
                 margin: 0 !important;
@@ -210,8 +210,8 @@ export default function PrintNotaPage() {
             }
             body {
               font-family: 'Courier New', Courier, monospace;
-              font-size: 16px;
-              line-height: 1.8;
+              font-size: 14px;
+              line-height: 1.6;
               color: #000;
               background: #f5f5f5;
               margin: 0;
@@ -221,7 +221,7 @@ export default function PrintNotaPage() {
               width: 241.3mm;
               max-width: 100%;
               margin: 0 auto;
-              padding: 12mm 14mm;
+              padding: 12mm 15mm;
               white-space: pre;
               word-wrap: break-word;
               background: #fff;
