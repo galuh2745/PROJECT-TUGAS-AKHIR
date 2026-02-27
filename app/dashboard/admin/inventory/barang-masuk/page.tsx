@@ -16,7 +16,7 @@ import { StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 const selectClass = 'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
 interface Perusahaan { id: string; nama_perusahaan: string; }
-interface BarangMasuk { id: string; perusahaan_id: string; perusahaan: Perusahaan; tanggal_masuk: string; jumlah_ekor: number; total_kg: number; bw: number; harga_per_kg: number; total_harga: number; tanggal_pembayaran: string | null; jumlah_transfer: number; saldo_kita: number; nama_kandang: string; alamat_kandang: string | null; no_mobil: string | null; nama_supir: string | null; created_at: string; }
+interface BarangMasuk { id: string; perusahaan_id: string; perusahaan: Perusahaan; tanggal_masuk: string; jumlah_ekor: number; total_kg: number; bw: number; harga_per_kg: number; total_harga: number; tanggal_pembayaran: string | null; jumlah_transfer: number; saldo_kita: number; nomor_do: string | null; nama_kandang: string; alamat_kandang: string | null; no_mobil: string | null; nama_supir: string | null; created_at: string; }
 
 export default function BarangMasukPage() {
   const [data, setData] = useState<BarangMasuk[]>([]);
@@ -29,7 +29,7 @@ export default function BarangMasukPage() {
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [selectedData, setSelectedData] = useState<BarangMasuk | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({ perusahaan_id: '', tanggal_masuk: '', jumlah_ekor: '', total_kg: '', harga_per_kg: '', tanggal_pembayaran: '', jumlah_transfer: '', nama_kandang: '', alamat_kandang: '', no_mobil: '', nama_supir: '' });
+  const [formData, setFormData] = useState({ perusahaan_id: '', tanggal_masuk: '', jumlah_ekor: '', total_kg: '', harga_per_kg: '', tanggal_pembayaran: '', jumlah_transfer: '', nomor_do: '', nama_kandang: '', alamat_kandang: '', no_mobil: '', nama_supir: '' });
 
   useEffect(() => { fetchPerusahaan(); }, []);
   useEffect(() => { fetchData(); }, [filterPerusahaan, filterTanggalDari, filterTanggalSampai]);
@@ -41,8 +41,8 @@ export default function BarangMasukPage() {
     } catch { toast.error('Terjadi kesalahan'); } finally { setLoading(false); }
   };
 
-  const openAddModal = () => { setModalMode('add'); const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; setFormData({ perusahaan_id: '', tanggal_masuk: localDate, jumlah_ekor: '', total_kg: '', harga_per_kg: '', tanggal_pembayaran: '', jumlah_transfer: '0', nama_kandang: '', alamat_kandang: '', no_mobil: '', nama_supir: '' }); setSelectedData(null); setShowModal(true); };
-  const openEditModal = (item: BarangMasuk) => { setModalMode('edit'); setFormData({ perusahaan_id: item.perusahaan_id, tanggal_masuk: item.tanggal_masuk, jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), harga_per_kg: item.harga_per_kg.toString(), tanggal_pembayaran: item.tanggal_pembayaran || '', jumlah_transfer: item.jumlah_transfer.toString(), nama_kandang: item.nama_kandang, alamat_kandang: item.alamat_kandang || '', no_mobil: item.no_mobil || '', nama_supir: item.nama_supir || '' }); setSelectedData(item); setShowModal(true); };
+  const openAddModal = () => { setModalMode('add'); const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; setFormData({ perusahaan_id: '', tanggal_masuk: localDate, jumlah_ekor: '', total_kg: '', harga_per_kg: '', tanggal_pembayaran: '', jumlah_transfer: '0', nomor_do: '', nama_kandang: '', alamat_kandang: '', no_mobil: '', nama_supir: '' }); setSelectedData(null); setShowModal(true); };
+  const openEditModal = (item: BarangMasuk) => { setModalMode('edit'); setFormData({ perusahaan_id: item.perusahaan_id, tanggal_masuk: item.tanggal_masuk, jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), harga_per_kg: item.harga_per_kg.toString(), tanggal_pembayaran: item.tanggal_pembayaran || '', jumlah_transfer: item.jumlah_transfer.toString(), nomor_do: item.nomor_do || '', nama_kandang: item.nama_kandang, alamat_kandang: item.alamat_kandang || '', no_mobil: item.no_mobil || '', nama_supir: item.nama_supir || '' }); setSelectedData(item); setShowModal(true); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true);
@@ -101,18 +101,19 @@ export default function BarangMasukPage() {
         <div className="overflow-x-auto">
           <Table>
             <TableHeader><TableRow>
-              <TableHead>Tanggal</TableHead><TableHead>Perusahaan</TableHead><TableHead>Kandang</TableHead><TableHead>No Mobil</TableHead><TableHead>Supir</TableHead>
+              <TableHead>Tanggal</TableHead><TableHead>Perusahaan</TableHead><TableHead>No DO</TableHead><TableHead>Kandang</TableHead><TableHead>No Mobil</TableHead><TableHead>Supir</TableHead>
               <TableHead className="text-right">Ekor</TableHead><TableHead className="text-right">Kg</TableHead><TableHead className="text-right">BW</TableHead>
               <TableHead className="text-right">Harga/Kg</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Transfer</TableHead>
               <TableHead className="text-right">Saldo</TableHead><TableHead>Aksi</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {loading ? <TableRow><TableCell colSpan={13} className="text-center py-8 text-muted-foreground">Memuat data...</TableCell></TableRow>
-              : data.length === 0 ? <TableRow><TableCell colSpan={13} className="text-center py-8 text-muted-foreground">Belum ada data</TableCell></TableRow>
+              {loading ? <TableRow><TableCell colSpan={14} className="text-center py-8 text-muted-foreground">Memuat data...</TableCell></TableRow>
+              : data.length === 0 ? <TableRow><TableCell colSpan={14} className="text-center py-8 text-muted-foreground">Belum ada data</TableCell></TableRow>
               : data.map(item => (
                 <TableRow key={item.id}>
                   <TableCell className="whitespace-nowrap">{item.tanggal_masuk}</TableCell>
                   <TableCell className="whitespace-nowrap">{item.perusahaan.nama_perusahaan}</TableCell>
+                  <TableCell>{item.nomor_do || '-'}</TableCell>
                   <TableCell>{item.nama_kandang}</TableCell>
                   <TableCell>{item.no_mobil || '-'}</TableCell>
                   <TableCell>{item.nama_supir || '-'}</TableCell>
@@ -151,6 +152,7 @@ export default function BarangMasukPage() {
               <div className="space-y-2"><Label>Jumlah Transfer</Label><Input type="number" value={formData.jumlah_transfer} onChange={(e) => setFormData({ ...formData, jumlah_transfer: e.target.value })} min={0} /></div>
               <div className="space-y-2"><Label>Saldo Kita (Otomatis)</Label><Input value={fmtC(calculatedSaldoKita)} disabled className={`bg-muted ${calculatedSaldoKita > 0 ? 'text-red-600' : 'text-emerald-600'}`} /></div>
               <div className="space-y-2"><Label>Tanggal Pembayaran</Label><input type="date" value={formData.tanggal_pembayaran} onChange={(e) => setFormData({ ...formData, tanggal_pembayaran: e.target.value })} className={selectClass} /></div>
+              <div className="space-y-2"><Label>Nomor DO</Label><Input value={formData.nomor_do} onChange={(e) => setFormData({ ...formData, nomor_do: e.target.value })} placeholder="Masukkan Nomor DO" /></div>
               <div className="space-y-2"><Label>Nama Kandang <span className="text-red-500">*</span></Label><Input value={formData.nama_kandang} onChange={(e) => setFormData({ ...formData, nama_kandang: e.target.value })} required /></div>
               <div className="space-y-2 md:col-span-2"><Label>Alamat Kandang</Label><Textarea value={formData.alamat_kandang} onChange={(e) => setFormData({ ...formData, alamat_kandang: e.target.value })} rows={2} /></div>
               <div className="space-y-2"><Label>No Mobil</Label><Input value={formData.no_mobil} onChange={(e) => setFormData({ ...formData, no_mobil: e.target.value })} /></div>

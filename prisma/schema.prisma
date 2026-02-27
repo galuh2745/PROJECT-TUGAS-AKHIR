@@ -188,6 +188,7 @@ model BarangKeluarDagingDetail {
 model BarangMasuk {
   id                 BigInt     @id @default(autoincrement())
   perusahaan_id      BigInt
+  nomor_do           String?    @db.VarChar(100)
   tanggal_masuk      DateTime   @db.Date
   jumlah_ekor        Int
   total_kg           Decimal    @db.Decimal(10, 2)

@@ -35,11 +35,12 @@ export async function GET(req: Request) {
 
     addHeader(doc, 'LAPORAN BARANG MASUK', filterText || undefined);
 
-    const headers = ['No', 'Tanggal', 'Perusahaan', 'Kandang', 'Ekor', 'Kg', 'BW', 'Harga/Kg', 'Total Harga', 'Transfer', 'Saldo'];
+    const headers = ['No', 'Tanggal', 'Perusahaan', 'No DO', 'Kandang', 'Ekor', 'Kg', 'BW', 'Harga/Kg', 'Total Harga', 'Transfer', 'Saldo'];
     const rows = data.map((item, i) => [
       (i + 1).toString(),
       new Date(item.tanggal_masuk).toLocaleDateString('id-ID'),
       item.perusahaan.nama_perusahaan,
+      item.nomor_do || '-',
       item.nama_kandang,
       fmtNum(item.jumlah_ekor),
       parseFloat(item.total_kg.toString()).toFixed(1),
@@ -58,7 +59,7 @@ export async function GET(req: Request) {
       saldo: a.saldo + parseFloat(i.saldo_kita.toString()),
     }), { ekor: 0, kg: 0, harga: 0, transfer: 0, saldo: 0 });
 
-    rows.push(['', '', '', 'TOTAL', fmtNum(totals.ekor), totals.kg.toFixed(1), '', '', fmtRp(totals.harga), fmtRp(totals.transfer), fmtRp(totals.saldo)]);
+    rows.push(['', '', '', '', 'TOTAL', fmtNum(totals.ekor), totals.kg.toFixed(1), '', '', fmtRp(totals.harga), fmtRp(totals.transfer), fmtRp(totals.saldo)]);
 
     autoTable(doc, {
       head: [headers],
@@ -69,13 +70,13 @@ export async function GET(req: Request) {
       headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold', halign: 'center' },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
-        4: { halign: 'right' },
         5: { halign: 'right' },
         6: { halign: 'right' },
         7: { halign: 'right' },
         8: { halign: 'right' },
         9: { halign: 'right' },
         10: { halign: 'right' },
+        11: { halign: 'right' },
       },
       didParseCell: (d) => {
         if (d.row.index === rows.length - 1) {
