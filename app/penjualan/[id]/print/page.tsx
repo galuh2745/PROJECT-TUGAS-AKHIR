@@ -303,6 +303,9 @@ export default function PrintNotaPage() {
         <pre className="nota-line">
           {'Customer : ' + data.customer.nama}
         </pre>
+        <pre className="nota-line">
+          {'Kurir    : '}
+        </pre>
         <pre className="nota-line">{DASH_LINE}</pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">
@@ -336,6 +339,20 @@ export default function PrintNotaPage() {
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">
           {'                     Terima kasih atas kepercayaannya'}
+        </pre>
+        <pre className="nota-line">{' '}</pre>
+        <pre className="nota-line">{' '}</pre>
+        <pre className="nota-line">
+          {padRight('Yang Menerima,', 38) + padLeft('Hormat Kami,', 38)}
+        </pre>
+        <pre className="nota-line">
+          {padRight('', 38) + padLeft('Bagian Penjualan', 38)}
+        </pre>
+        <pre className="nota-line">{' '}</pre>
+        <pre className="nota-line">{' '}</pre>
+        <pre className="nota-line">{' '}</pre>
+        <pre className="nota-line">
+          {padRight('(....................)', 38) + padLeft('(DWI FATMAWATI)', 38)}
         </pre>
         <pre className="nota-line">{SEPARATOR}</pre>
       </div>
