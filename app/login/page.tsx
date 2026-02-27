@@ -112,73 +112,104 @@ function LoginContent() {
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
       {/* ===== BACKGROUND ===== */}
       <div className="absolute inset-0 z-0">
-        {/* Background image */}
+        {/* Deep gradient background */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: 'url(/images/logo/logocv.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            filter: 'blur(6px) brightness(0.4)',
-            transform: 'scale(1.1)',
+            background: 'linear-gradient(160deg, #0a1628 0%, #0f2847 25%, #132e52 45%, #1a3a6b 65%, #1e3a8a 85%, #1e40af 100%)',
           }}
         />
-        {/* Blue gradient overlay */}
+        {/* Animated mesh gradient overlay */}
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(135deg, rgba(30, 58, 138, 0.85) 0%, rgba(37, 99, 235, 0.7) 40%, rgba(29, 78, 216, 0.8) 70%, rgba(15, 23, 42, 0.9) 100%)',
+            background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(37,99,235,0.15) 0%, transparent 60%), radial-gradient(ellipse 60% 80% at 20% 80%, rgba(59,130,246,0.1) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 80% 20%, rgba(96,165,250,0.08) 0%, transparent 50%)',
           }}
         />
-        {/* Subtle pattern overlay */}
+        {/* Subtle dot pattern overlay */}
         <div
-          className="absolute inset-0 opacity-[0.03]"
+          className="absolute inset-0 opacity-[0.04]"
           style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
-            backgroundSize: '40px 40px',
+            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.8) 1px, transparent 0)`,
+            backgroundSize: '32px 32px',
+          }}
+        />
+        {/* Noise texture overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.015]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
+            backgroundSize: '128px 128px',
+          }}
+        />
+      </div>
+
+      {/* ===== RADIAL GLOW BEHIND CARD ===== */}
+      <div className="absolute inset-0 z-[1] flex items-center justify-center pointer-events-none">
+        <div
+          className="w-[600px] h-[600px] md:w-[700px] md:h-[700px]"
+          style={{
+            background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(37,99,235,0.08) 35%, transparent 70%)',
+            filter: 'blur(40px)',
           }}
         />
       </div>
 
       {/* ===== FLOATING DECORATIVE ELEMENTS ===== */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, rgba(96,165,250,0.4) 0%, transparent 70%)' }} />
-        <div className="absolute -bottom-32 -left-32 w-125 h-125 rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, rgba(147,197,253,0.3) 0%, transparent 70%)' }} />
-        <div className="absolute top-1/4 right-1/4 w-64 h-64 rounded-full opacity-5"
-          style={{ background: 'radial-gradient(circle, rgba(253,224,71,0.5) 0%, transparent 70%)' }} />
+      <div className="absolute inset-0 z-[1] overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -right-32 w-[500px] h-[500px] rounded-full opacity-[0.07]"
+          style={{ background: 'radial-gradient(circle, rgba(96,165,250,0.6) 0%, transparent 70%)' }} />
+        <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] rounded-full opacity-[0.06]"
+          style={{ background: 'radial-gradient(circle, rgba(147,197,253,0.5) 0%, transparent 70%)' }} />
+        <div className="absolute top-[15%] right-[10%] w-80 h-80 rounded-full opacity-[0.04]"
+          style={{ background: 'radial-gradient(circle, rgba(219,234,254,0.6) 0%, transparent 60%)' }} />
+        {/* Subtle horizontal light streak */}
+        <div className="absolute top-1/2 left-0 w-full h-px opacity-[0.06]"
+          style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(147,197,253,0.5) 30%, rgba(96,165,250,0.5) 50%, rgba(147,197,253,0.5) 70%, transparent 100%)' }} />
+      </div>
+
+      {/* ===== WATERMARK LOGO ===== */}
+      <div className="absolute inset-0 z-[1] flex items-center justify-center pointer-events-none">
+        <div className="relative w-[500px] h-[500px] opacity-[0.03]">
+          <Image
+            src="/images/logo/logocvaswihd.png"
+            alt=""
+            fill
+            className="object-contain"
+            aria-hidden="true"
+          />
+        </div>
       </div>
 
       {/* ===== MAIN LOGIN CARD ===== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={mounted ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="relative z-10 w-full max-w-110 mx-4"
+        initial={{ opacity: 0, y: 30, scale: 0.97 }}
+        animate={mounted ? { opacity: 1, y: 0, scale: 1 } : {}}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-[430px] mx-4"
       >
         <div
-          className="rounded-3xl px-8 py-6 md:px-10 md:py-8 shadow-2xl border border-white/20"
+          className="relative rounded-3xl px-8 py-8 md:px-11 md:py-10 border border-white/[0.18] overflow-hidden"
           style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.82)',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+            boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.35), 0 8px 24px -8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
           }}
         >
+          {/* Card top edge highlight */}
+          <div className="absolute top-0 left-0 right-0 h-[1px]"
+            style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 20%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0.6) 80%, transparent 100%)' }} />
+
           {/* ===== LOGO AVATAR ===== */}
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={mounted ? { opacity: 1, scale: 1 } : {}}
-            transition={{ delay: 0.15, duration: 0.4, ease: 'easeOut' }}
-            className="flex flex-col items-center mb-4"
+            transition={{ delay: 0.2, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-col items-center mb-6"
           >
             <div
-              className="relative w-20 h-20 rounded-full overflow-hidden border-[3px] mb-3"
-              style={{
-                borderColor: '#2563eb',
-                boxShadow: '0 8px 32px rgba(37, 99, 235, 0.25), 0 0 0 4px rgba(37, 99, 235, 0.1)',
-              }}
+              className="relative w-[88px] h-[88px] overflow-hidden mb-4"
             >
               <Image
                 src="/images/logo/logocvaswihd.png"
@@ -188,54 +219,67 @@ function LoginContent() {
                 priority
               />
             </div>
-            <h1 className="text-lg font-bold text-gray-800 tracking-tight">
+            <h1 className="text-xl font-extrabold text-gray-800 tracking-tight">
               CV Aswi Sentosa Lampung
             </h1>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 mt-1 font-medium tracking-wide">
               Sistem Absensi & Inventory
             </p>
+            {/* Gradient accent line under title */}
+            <div className="mt-3 w-16 h-[3px] rounded-full"
+              style={{ background: 'linear-gradient(90deg, #3b82f6, #2563eb, #1d4ed8)' }} />
           </motion.div>
 
           {/* ===== DIVIDER ===== */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Masuk ke Akun</span>
-            <div className="flex-1 h-px bg-gray-200" />
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.15em]">Masuk ke Akun</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
           </div>
 
           {/* ===== FORM LOGIN ===== */}
           <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1.5">
+            <motion.div
+              initial={{ opacity: 0, x: -15 }}
+              animate={mounted ? { opacity: 1, x: 0 } : {}}
+              transition={{ delay: 0.3, duration: 0.4, ease: 'easeOut' }}
+              className="space-y-1.5"
+            >
               <Label htmlFor="nip" className="text-sm font-semibold text-gray-700">
                 NIP
               </Label>
               <div className="relative group">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400 transition-colors duration-200 group-focus-within:text-blue-600" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400 transition-all duration-300 group-focus-within:text-blue-600 group-focus-within:scale-110" />
                 <Input
                   id="nip"
                   type="text"
                   value={nip}
                   onChange={(e) => setNip(e.target.value)}
-                  className="pl-11 h-11 rounded-xl border-gray-200 bg-gray-50/80 text-gray-800 placeholder:text-gray-400 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-white hover:border-gray-300"
+                  className="pl-11 h-12 rounded-xl border-gray-200/80 bg-white/60 text-gray-800 placeholder:text-gray-400 transition-all duration-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:shadow-lg focus:shadow-blue-500/5 hover:border-gray-300 hover:bg-white/80"
                   placeholder="Masukkan NIP"
                   required
                   autoComplete="username"
                 />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="space-y-1.5">
+            <motion.div
+              initial={{ opacity: 0, x: -15 }}
+              animate={mounted ? { opacity: 1, x: 0 } : {}}
+              transition={{ delay: 0.4, duration: 0.4, ease: 'easeOut' }}
+              className="space-y-1.5"
+            >
               <Label htmlFor="password" className="text-sm font-semibold text-gray-700">
                 Password
               </Label>
               <div className="relative group">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400 transition-colors duration-200 group-focus-within:text-blue-600" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400 transition-all duration-300 group-focus-within:text-blue-600 group-focus-within:scale-110" />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-11 pr-11 h-11 rounded-xl border-gray-200 bg-gray-50/80 text-gray-800 placeholder:text-gray-400 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-white hover:border-gray-300"
+                  className="pl-11 pr-11 h-12 rounded-xl border-gray-200/80 bg-white/60 text-gray-800 placeholder:text-gray-400 transition-all duration-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:shadow-lg focus:shadow-blue-500/5 hover:border-gray-300 hover:bg-white/80"
                   placeholder="••••••••"
                   required
                   autoComplete="current-password"
@@ -243,84 +287,93 @@ function LoginContent() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-all duration-300 hover:scale-110"
                   tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                  {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
                 </button>
               </div>
-            </div>
+            </motion.div>
 
             {error && (
               <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 p-3.5 rounded-xl border"
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.06)',
-                  borderColor: 'rgba(239, 68, 68, 0.15)',
-                }}
+                initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="flex items-center gap-3 p-3.5 rounded-xl border border-red-200/60 bg-red-50/50 backdrop-blur-sm"
               >
                 <Info className="h-4 w-4 text-red-500 shrink-0" />
-                <span className="text-red-600 text-sm">{error}</span>
+                <span className="text-red-600 text-sm font-medium">{error}</span>
               </motion.div>
             )}
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 text-sm font-semibold rounded-xl shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:hover:scale-100"
-              style={{
-                backgroundColor: '#2563eb',
-                color: 'white',
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#1d4ed8'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; }}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={mounted ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: 0.5, duration: 0.4, ease: 'easeOut' }}
             >
-              {loading ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  Memproses...
-                </>
-              ) : (
-                <>
-                  Masuk
-                  <ArrowRight className="h-5 w-5 ml-2" />
-                </>
-              )}
-            </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-12 text-sm font-bold rounded-xl transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-blue-600/25 active:scale-[0.97] disabled:opacity-70 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)',
+                  color: 'white',
+                  boxShadow: '0 8px 24px -4px rgba(37, 99, 235, 0.4), 0 2px 8px -2px rgba(37, 99, 235, 0.2)',
+                }}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Memproses...
+                  </>
+                ) : (
+                  <>
+                    Masuk
+                    <ArrowRight className="h-5 w-5 ml-2 transition-transform duration-300 group-hover:translate-x-1" />
+                  </>
+                )}
+              </Button>
+            </motion.div>
 
-            <div className="text-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={mounted ? { opacity: 1 } : {}}
+              transition={{ delay: 0.6, duration: 0.4 }}
+              className="text-center pt-1"
+            >
               <button
                 type="button"
                 onClick={() => setShowForgotModal(true)}
-                className="text-sm font-medium transition-all duration-200 hover:underline underline-offset-4"
-                style={{ color: '#2563eb' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#1d4ed8'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = '#2563eb'; }}
+                className="text-sm font-medium text-blue-600 transition-all duration-300 hover:text-blue-800 hover:underline underline-offset-4 decoration-blue-400/40"
               >
                 Lupa Password?
               </button>
-            </div>
+            </motion.div>
           </form>
 
           {/* ===== INFO SECTION ===== */}
-          <div className="mt-5 pt-4 border-t border-gray-100">
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-blue-50/70 border border-blue-100">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={mounted ? { opacity: 1 } : {}}
+            transition={{ delay: 0.7, duration: 0.4 }}
+            className="mt-6 pt-5 border-t border-gray-200/60"
+          >
+            <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-blue-50/50 border border-blue-100/60 backdrop-blur-sm">
               <Info className="w-4 h-4 text-blue-500 shrink-0" />
-              <p className="text-gray-500 text-xs leading-snug">
+              <p className="text-gray-500 text-xs leading-relaxed">
                 <span className="font-semibold text-gray-600">Butuh bantuan?</span> Hubungi admin untuk masalah login.
               </p>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* ===== FOOTER ===== */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={mounted ? { opacity: 1 } : {}}
-          transition={{ delay: 0.6, duration: 0.4 }}
-          className="text-center text-white/60 text-xs mt-4"
+          transition={{ delay: 0.8, duration: 0.5 }}
+          className="text-center text-white/40 text-xs mt-6 font-medium tracking-wide"
         >
           © 2026 CV Aswi Sentosa Lampung. All rights reserved.
         </motion.p>
@@ -333,45 +386,48 @@ function LoginContent() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-black/50 backdrop-blur-md"
             onClick={() => { setShowForgotModal(false); setForgotNip(''); }}
           />
 
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.92, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="relative w-full max-w-md"
           >
             <div
-              className="rounded-2xl overflow-hidden shadow-2xl border border-white/20"
+              className="rounded-3xl overflow-hidden border border-white/[0.18]"
               style={{
-                background: 'rgba(255, 255, 255, 0.98)',
-                backdropFilter: 'blur(20px)',
+                background: 'rgba(255, 255, 255, 0.92)',
+                backdropFilter: 'blur(24px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.4), 0 8px 24px -8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
               }}
             >
               {/* Modal Header with Blue Gradient */}
               <div
-                className="px-6 py-5"
+                className="px-7 py-6"
                 style={{
-                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 40%, #1e40af 100%)',
+                  boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.1)',
                 }}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm border border-white/20">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm border border-white/25 shadow-lg shadow-black/10">
                       <KeyRound className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-white">Lupa Password</h3>
-                      <p className="text-blue-100 text-sm mt-0.5">Reset melalui admin</p>
+                      <h3 className="text-lg font-bold text-white tracking-tight">Lupa Password</h3>
+                      <p className="text-blue-200/80 text-sm mt-0.5">Reset melalui admin</p>
                     </div>
                   </div>
                   <button
                     onClick={() => { setShowForgotModal(false); setForgotNip(''); }}
-                    className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/80 hover:bg-white/20 hover:text-white transition-all duration-200"
+                    className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white/70 hover:bg-white/20 hover:text-white hover:scale-110 active:scale-95 transition-all duration-300"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -379,7 +435,7 @@ function LoginContent() {
               </div>
 
               {/* Modal Body */}
-              <div className="px-6 py-6 space-y-5">
+              <div className="px-7 py-7 space-y-5">
                 <p className="text-gray-500 text-sm leading-relaxed">
                   Masukkan NIP untuk mengirim permintaan reset password ke admin.
                 </p>
@@ -387,25 +443,27 @@ function LoginContent() {
                 <div className="space-y-1.5">
                   <Label className="text-sm font-semibold text-gray-700">NIP</Label>
                   <div className="relative group">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-400 transition-colors duration-200 group-focus-within:text-blue-600" />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400 transition-all duration-300 group-focus-within:text-blue-600 group-focus-within:scale-110" />
                     <Input
                       type="text"
                       value={forgotNip}
                       onChange={(e) => setForgotNip(e.target.value)}
                       placeholder="Masukkan NIP"
-                      className="pl-11 h-12 rounded-xl border-gray-200 bg-gray-50/80 text-gray-800 placeholder:text-gray-400 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-white hover:border-gray-300"
+                      className="pl-11 h-12 rounded-xl border-gray-200/80 bg-white/60 text-gray-800 placeholder:text-gray-400 transition-all duration-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:shadow-lg focus:shadow-blue-500/5 hover:border-gray-300 hover:bg-white/80"
                     />
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-1">
+                <div className="flex gap-3 pt-2">
                   <Button
                     onClick={handleForgotPassword}
                     disabled={forgotLoading}
-                    className="flex-1 h-11 font-semibold rounded-xl shadow-md transition-all duration-200 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:hover:scale-100"
-                    style={{ backgroundColor: '#2563eb', color: 'white' }}
-                    onMouseEnter={(e) => { if (!forgotLoading) e.currentTarget.style.backgroundColor = '#1d4ed8'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; }}
+                    className="flex-1 h-12 font-bold rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-blue-600/20 active:scale-[0.97] disabled:opacity-70 disabled:hover:scale-100 cursor-pointer"
+                    style={{
+                      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)',
+                      color: 'white',
+                      boxShadow: '0 6px 20px -4px rgba(37, 99, 235, 0.35)',
+                    }}
                   >
                     {forgotLoading ? (
                       <>
@@ -419,7 +477,7 @@ function LoginContent() {
                   <Button
                     variant="outline"
                     onClick={() => { setShowForgotModal(false); setForgotNip(''); }}
-                    className="flex-1 h-11 font-semibold rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-700 transition-all duration-200"
+                    className="flex-1 h-12 font-bold rounded-xl border-gray-200/80 text-gray-600 hover:bg-gray-50/80 hover:text-gray-700 hover:border-gray-300 hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
                   >
                     Batal
                   </Button>
