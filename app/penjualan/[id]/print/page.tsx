@@ -67,7 +67,7 @@ const padLeft = (str: string, len: number): string => {
   return ' '.repeat(len - str.length) + str;
 };
 
-const LINE_WIDTH = 76;
+const LINE_WIDTH = 115;
 const SEPARATOR = '='.repeat(LINE_WIDTH);
 const DASH_LINE = '-'.repeat(LINE_WIDTH);
 
@@ -154,23 +154,23 @@ export default function PrintNotaPage() {
       const hargaStr = formatRupiah(d.harga);
       const subtotalStr = formatRupiah(d.subtotal);
       const line =
-        padRight(itemName, 28) +
-        padLeft(ekorStr, 12) +
-        padLeft(hargaStr, 18) +
-        padLeft(subtotalStr, 18);
+        padRight(itemName, 40) +
+        padLeft(ekorStr, 17) +
+        padLeft(hargaStr, 29) +
+        padLeft(subtotalStr, 29);
       detailLines.push(line);
       const beratLine =
-        padRight('  Berat', 28) + padLeft(`${d.berat.toLocaleString('id-ID')} kg`, 12);
+        padRight('  Berat', 40) + padLeft(`${d.berat.toLocaleString('id-ID')} kg`, 17);
       detailLines.push(beratLine);
     } else {
       const beratStr = `${d.berat.toLocaleString('id-ID')} kg`;
       const hargaStr = formatRupiah(d.harga);
       const subtotalStr = formatRupiah(d.subtotal);
       const line =
-        padRight(itemName, 28) +
-        padLeft(beratStr, 12) +
-        padLeft(hargaStr, 18) +
-        padLeft(subtotalStr, 18);
+        padRight(itemName, 40) +
+        padLeft(beratStr, 17) +
+        padLeft(hargaStr, 29) +
+        padLeft(subtotalStr, 29);
       detailLines.push(line);
     }
   });
@@ -187,12 +187,12 @@ export default function PrintNotaPage() {
             @media print {
               @page {
                 size: 241.3mm 279.4mm;
-                margin: 12mm 15mm 10mm 15mm;
+                margin: 5mm 8mm 5mm 8mm;
               }
               body {
                 font-family: 'Courier New', Courier, monospace !important;
-                font-size: 14px !important;
-                line-height: 1.6 !important;
+                font-size: 12px !important;
+                line-height: 1.3 !important;
                 color: #000 !important;
                 background: #fff !important;
                 margin: 0 !important;
@@ -210,8 +210,8 @@ export default function PrintNotaPage() {
             }
             body {
               font-family: 'Courier New', Courier, monospace;
-              font-size: 14px;
-              line-height: 1.6;
+              font-size: 12px;
+              line-height: 1.3;
               color: #000;
               background: #f5f5f5;
               margin: 0;
@@ -221,7 +221,7 @@ export default function PrintNotaPage() {
               width: 241.3mm;
               max-width: 100%;
               margin: 0 auto;
-              padding: 12mm 15mm;
+              padding: 5mm 8mm;
               white-space: pre;
               word-wrap: break-word;
               background: #fff;
@@ -271,48 +271,46 @@ export default function PrintNotaPage() {
         {isRevisi && (
           <>
             <pre className="nota-line revisi-header">
-              {'                    *** NOTA REVISI ***'}
+              {'                                            *** NOTA REVISI ***'}
             </pre>
             <pre className="nota-line">
               {'         Revisi pada: ' + formatWaktu(data.updated_at)}
             </pre>
-            <pre className="nota-line">{' '}</pre>
           </>
         )}
 
         {!isRevisi && isReprint && (
           <>
             <pre className="nota-line revisi-header">
-              {'                                         *** CETAK ULANG ***'}
+              {'                                            *** CETAK ULANG ***'}
             </pre>
-            <pre className="nota-line">{' '}</pre>
           </>
         )}
 
+        {/* Header: Company info (left) + Nota info (right) */}
         <pre className="nota-line">
-          {'                              CV ASWI SENTOSA LAMPUNG'}
-        </pre>
-        
-        <pre className="nota-line">{DASH_LINE}</pre>
-        <pre className="nota-line">
-          {'Tanggal  : ' + formatTanggal(data.tanggal)}
+          {padRight('CV ASWI SENTOSA LAMPUNG', 70) + 'NOTA PENJUALAN'}
         </pre>
         <pre className="nota-line">
-          {'No Nota  : ' + (data.nomor_nota || 'DRAFT')}
+          {padRight('JL. MUFAKAT WAWAI, YUKUM JAYA', 70) + 'No Nota  : ' + (data.nomor_nota || 'DRAFT')}
         </pre>
         <pre className="nota-line">
-          {'Customer : ' + data.customer.nama}
+          {padRight('No Telp. 0851-9975-2567', 70) + 'Tanggal  : ' + formatTanggal(data.tanggal)}
         </pre>
         <pre className="nota-line">
-          {'Kurir    : '}
+          {padRight('', 70) + 'Customer : ' + data.customer.nama}
         </pre>
+        <pre className="nota-line">
+          {padRight('', 70) + 'Kurir    : '}
+        </pre>
+
         <pre className="nota-line">{DASH_LINE}</pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">
-          {padRight('ITEM', 28) +
-            padLeft('QTY', 12) +
-            padLeft('HARGA', 18) +
-            padLeft('TOTAL', 18)}
+          {padRight('ITEM', 40) +
+            padLeft('QTY', 17) +
+            padLeft('HARGA', 29) +
+            padLeft('TOTAL', 29)}
         </pre>
         <pre className="nota-line">{DASH_LINE}</pre>
 
@@ -324,35 +322,35 @@ export default function PrintNotaPage() {
 
         <pre className="nota-line">{DASH_LINE}</pre>
         <pre className="nota-line">
-          {padRight('TOTAL', 40) + padLeft(totalStr, 36)}
+          {padRight('TOTAL', 57) + padLeft(totalStr, 58)}
         </pre>
         <pre className="nota-line">
-          {padRight('Bayar', 40) + padLeft(bayarStr, 36)}
+          {padRight('Bayar', 57) + padLeft(bayarStr, 58)}
         </pre>
         <pre className="nota-line">
-          {padRight('Sisa', 40) + padLeft(sisaStr, 36)}
+          {padRight('Sisa', 57) + padLeft(sisaStr, 58)}
         </pre>
         <pre className="nota-line">
-          {padRight('Status', 40) + padLeft(data.status.toUpperCase(), 36)}
+          {padRight('Status', 57) + padLeft(data.status.toUpperCase(), 58)}
         </pre>
         <pre className="nota-line">{DASH_LINE}</pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">
-          {'                     Terima kasih atas kepercayaannya'}
+          {'                                        Terima kasih atas kepercayaannya'}
         </pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">
-          {padRight('Yang Menerima,', 38) + padLeft('Hormat Kami,', 38)}
+          {padRight('Yang Menerima,', 57) + padLeft('Hormat Kami,', 58)}
         </pre>
         <pre className="nota-line">
-          {padRight('', 38) + padLeft('Bagian Penjualan', 38)}
+          {padRight('', 57) + padLeft('Bagian Penjualan', 58)}
         </pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">{' '}</pre>
         <pre className="nota-line">
-          {padRight('(....................)', 38) + padLeft('(DWI FATMAWATI)', 38)}
+          {padRight('(....................)', 57) + padLeft('(DWI FATMAWATI)', 58)}
         </pre>
         <pre className="nota-line">{SEPARATOR}</pre>
       </div>
