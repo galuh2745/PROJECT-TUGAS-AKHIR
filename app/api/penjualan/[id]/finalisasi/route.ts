@@ -42,7 +42,7 @@ async function generateNomorNota(tanggal: Date, tx: Prisma.TransactionClient): P
   return `${prefix}${String(nextNumber).padStart(3, '0')}`;
 }
 
-// POST: Finalisasi draft → generate nota, always hutang (pelunasan via Piutang page)
+// POST: Finalisasi draft → generate nota, support pembayaran langsung
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -54,6 +54,9 @@ export async function POST(
     }
 
     const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+    const jumlahBayarInput = parseFloat(body.jumlah_bayar || '0') || 0;
+    const metodePembayaran = body.metode_pembayaran || null;
 
     const penjualan = await prisma.penjualan.findUnique({
       where: { id: BigInt(id) },
@@ -70,6 +73,24 @@ export async function POST(
 
     const grandTotal = parseFloat(penjualan.grand_total.toString());
 
+    // Validasi jumlah bayar tidak melebihi grand total
+    const jumlahBayar = Math.min(jumlahBayarInput, grandTotal);
+    const sisaPiutang = grandTotal - jumlahBayar;
+
+    // Tentukan status berdasarkan pembayaran
+    let status: string;
+    let metode: string;
+    if (jumlahBayar >= grandTotal) {
+      status = 'lunas';
+      metode = metodePembayaran || 'CASH';
+    } else if (jumlahBayar > 0) {
+      status = 'sebagian';
+      metode = metodePembayaran || 'CASH';
+    } else {
+      status = 'hutang';
+      metode = 'BELUM_BAYAR';
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const nomorNota = await generateNomorNota(penjualan.tanggal, tx);
 
@@ -77,11 +98,11 @@ export async function POST(
         where: { id: BigInt(id) },
         data: {
           nomor_nota: nomorNota,
-          jumlah_bayar: new Decimal('0'),
-          sisa_piutang: new Decimal(grandTotal.toFixed(2)),
-          status: 'hutang',
+          jumlah_bayar: new Decimal(jumlahBayar.toFixed(2)),
+          sisa_piutang: new Decimal(sisaPiutang.toFixed(2)),
+          status,
           status_cetak: true,
-          metode_pembayaran: 'BELUM_BAYAR',
+          metode_pembayaran: metode,
         },
       });
 
@@ -95,7 +116,7 @@ export async function POST(
         id: result.id.toString(),
         nomor_nota: result.nomor_nota,
         grand_total: parseFloat(result.grand_total.toString()),
-        jumlah_bayar: 0,
+        jumlah_bayar: parseFloat(result.jumlah_bayar.toString()),
         sisa_piutang: parseFloat(result.sisa_piutang.toString()),
         status: result.status,
       },
