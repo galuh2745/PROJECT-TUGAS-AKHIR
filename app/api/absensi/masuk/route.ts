@@ -312,7 +312,7 @@ export async function POST(req: Request) {
     const currentTime = new Date();
     
     // Tentukan status absensi
-    let status: string;
+    let status: 'HADIR' | 'TERLAMBAT';
     
     if (isSkipJamKerja) {
       // Driver/Helper Driver: selalu HADIR, tidak ada pengecekan jam
