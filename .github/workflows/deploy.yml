@@ -33,4 +33,6 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /home/aswisentosalampung/projects/aswisentosa
+            git checkout -- .
+            git pull origin main
             ./deploy.sh
