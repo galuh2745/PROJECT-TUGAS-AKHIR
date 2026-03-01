@@ -69,12 +69,31 @@ export async function GET(req: Request) {
     const lastDayOfMonth = new Date(Date.UTC(filterTahun, filterBulan, 0, 23, 59, 59, 999));
 
     // 1. Status absensi hari ini
-    const absensiHariIni = await prisma.absensi.findFirst({
+    let absensiHariIni = await prisma.absensi.findFirst({
       where: {
         karyawan_id: karyawan.id,
         tanggal: today,
       },
     });
+
+    // Shift malam: jika belum ada absensi hari ini, cek kemarin (cross-midnight)
+    // Ini untuk menampilkan status "sudah masuk" di dashboard pagi hari
+    if (!absensiHariIni && karyawan.jenis_karyawan.is_shift_malam) {
+      const yesterday = new Date(today);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      
+      const openAbsensiKemarin = await prisma.absensi.findFirst({
+        where: {
+          karyawan_id: karyawan.id,
+          tanggal: yesterday,
+          jam_pulang: null, // belum checkout
+        },
+      });
+
+      if (openAbsensiKemarin) {
+        absensiHariIni = openAbsensiKemarin;
+      }
+    }
 
     // 2. Total kehadiran bulan berjalan
     const totalKehadiranBulanIni = await prisma.absensi.count({
@@ -196,6 +215,8 @@ export async function GET(req: Request) {
           jenis_karyawan: karyawan.jenis_karyawan.nama_jenis,
           jam_masuk_normal: karyawan.jenis_karyawan.jam_masuk,
           jam_pulang_normal: karyawan.jenis_karyawan.jam_pulang,
+          is_shift_malam: karyawan.jenis_karyawan.is_shift_malam,
+          skip_jam_kerja: karyawan.jenis_karyawan.skip_jam_kerja,
         },
         ringkasan: {
           absensi_hari_ini: formattedAbsensiHariIni,

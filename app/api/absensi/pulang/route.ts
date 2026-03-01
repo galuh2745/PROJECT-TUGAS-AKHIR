@@ -21,10 +21,22 @@ export async function POST(req: Request) {
 
     const karyawan = await prisma.karyawan.findUnique({
       where: { user_id: BigInt(userId) },
+      include: { jenis_karyawan: true },
     });
 
     if (!karyawan || karyawan.status !== 'AKTIF') {
       return NextResponse.json({ success: false, error: 'Karyawan tidak aktif' }, { status: 403 });
+    }
+
+    const isShiftMalam = karyawan.jenis_karyawan.is_shift_malam;
+    const isSkipJamKerja = karyawan.jenis_karyawan.skip_jam_kerja;
+
+    // Driver/Helper Driver tidak perlu absen pulang
+    if (isSkipJamKerja) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Jenis karyawan Anda tidak memerlukan absen pulang' 
+      }, { status: 400 });
     }
 
     // Gunakan tanggal lokal (konsisten dengan absensi masuk)
@@ -35,19 +47,37 @@ export async function POST(req: Request) {
     const todayStr = `${year}-${month}-${day}`;
     const today = new Date(todayStr + 'T00:00:00.000Z');
 
-    const absensi = await prisma.absensi.findFirst({
+    let absensi = await prisma.absensi.findFirst({
       where: {
         karyawan_id: karyawan.id,
         tanggal: today,
       },
     });
 
+    // Shift malam: jika tidak ada absensi hari ini, cek kemarin (cross-midnight)
+    if (!absensi && isShiftMalam) {
+      const yesterday = new Date(today);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      
+      absensi = await prisma.absensi.findFirst({
+        where: {
+          karyawan_id: karyawan.id,
+          tanggal: yesterday,
+          jam_pulang: null, // hanya yang belum checkout
+        },
+      });
+
+      if (absensi) {
+        console.log(`Shift malam cross-midnight: karyawan ${karyawan.nama} absen pulang untuk tanggal ${yesterday.toISOString().split('T')[0]}`);
+      }
+    }
+
     if (!absensi) {
       return NextResponse.json({ success: false, error: 'Belum melakukan check-in hari ini' }, { status: 400 });
     }
 
     if (absensi.jam_pulang) {
-      return NextResponse.json({ success: false, error: 'Sudah melakukan check-out hari ini' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Sudah melakukan check-out' }, { status: 400 });
     }
 
     const currentTime = new Date();
@@ -57,7 +87,7 @@ export async function POST(req: Request) {
       data: { jam_pulang: currentTime },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'Berhasil absen pulang!' });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });

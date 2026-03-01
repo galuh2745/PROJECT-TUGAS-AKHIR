@@ -21,6 +21,8 @@ interface JenisKaryawan {
   jam_masuk: string;
   jam_pulang: string;
   toleransi_terlambat: number;
+  is_shift_malam: boolean;
+  skip_jam_kerja: boolean;
   jumlah_karyawan: number;
 }
 
@@ -74,6 +76,7 @@ export default function ManajemenKaryawanPage() {
 
   const [formJenis, setFormJenis] = useState({
     nama_jenis: '', jam_masuk: '07:00', jam_pulang: '16:00', toleransi_terlambat: 15,
+    is_shift_malam: false, skip_jam_kerja: false,
   });
 
   const fetchData = async (isInitial = false) => {
@@ -206,7 +209,7 @@ export default function ManajemenKaryawanPage() {
       if (result.success) {
         toast.success('Jenis karyawan berhasil ditambahkan');
         setShowAddJenisModal(false);
-        setFormJenis({ nama_jenis: '', jam_masuk: '07:00', jam_pulang: '16:00', toleransi_terlambat: 15 });
+        setFormJenis({ nama_jenis: '', jam_masuk: '07:00', jam_pulang: '16:00', toleransi_terlambat: 15, is_shift_malam: false, skip_jam_kerja: false });
         fetchData();
       } else toast.error(result.error);
     } catch { toast.error('Terjadi kesalahan'); } finally { setFormLoading(false); }
@@ -259,6 +262,8 @@ export default function ManajemenKaryawanPage() {
       jam_masuk: `${String(jm.getHours()).padStart(2, '0')}:${String(jm.getMinutes()).padStart(2, '0')}`,
       jam_pulang: `${String(jp.getHours()).padStart(2, '0')}:${String(jp.getMinutes()).padStart(2, '0')}`,
       toleransi_terlambat: jenis.toleransi_terlambat,
+      is_shift_malam: jenis.is_shift_malam || false,
+      skip_jam_kerja: jenis.skip_jam_kerja || false,
     });
     setShowEditJenisModal(true);
   };
@@ -308,6 +313,28 @@ export default function ManajemenKaryawanPage() {
   const renderJenisForm = (onSubmit: (e: React.FormEvent) => void, isEdit?: boolean) => (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2"><Label>Nama Jenis *</Label><Input value={formJenis.nama_jenis} onChange={(e) => setFormJenis({ ...formJenis, nama_jenis: e.target.value })} placeholder="Contoh: Supir, Kurir" required /></div>
+      
+      {/* Opsi khusus */}
+      <div className="space-y-3 p-3 bg-gray-50 rounded-lg border">
+        <h4 className="text-sm font-medium text-gray-700">Opsi Khusus</h4>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={formJenis.skip_jam_kerja} onChange={(e) => setFormJenis({ ...formJenis, skip_jam_kerja: e.target.checked })} className="w-4 h-4 rounded border-gray-300" />
+          <div>
+            <span className="text-sm font-medium">Skip Jam Kerja (Driver/Helper)</span>
+            <p className="text-xs text-muted-foreground">Hanya perlu foto & lokasi, tanpa jam masuk/pulang. Tidak ada status terlambat/alpha.</p>
+          </div>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={formJenis.is_shift_malam} onChange={(e) => setFormJenis({ ...formJenis, is_shift_malam: e.target.checked })} className="w-4 h-4 rounded border-gray-300" />
+          <div>
+            <span className="text-sm font-medium">Shift Malam (Cross-Midnight)</span>
+            <p className="text-xs text-muted-foreground">Masuk malam, pulang pagi hari berikutnya. Sistem akan mencari absensi kemarin saat checkout.</p>
+          </div>
+        </label>
+      </div>
+
+      {!formJenis.skip_jam_kerja && (
+      <>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2"><Label>Jam Masuk *</Label><Input type="time" value={formJenis.jam_masuk} onChange={(e) => setFormJenis({ ...formJenis, jam_masuk: e.target.value })} required /></div>
         <div className="space-y-2"><Label>Jam Pulang *</Label><Input type="time" value={formJenis.jam_pulang} onChange={(e) => setFormJenis({ ...formJenis, jam_pulang: e.target.value })} required /></div>
@@ -317,6 +344,8 @@ export default function ManajemenKaryawanPage() {
         <Input type="number" value={formJenis.toleransi_terlambat} onChange={(e) => setFormJenis({ ...formJenis, toleransi_terlambat: parseInt(e.target.value) || 0 })} min={0} max={60} />
         <p className="text-xs text-muted-foreground">Absen sebelum jam masuk + toleransi = HADIR</p>
       </div>
+      </>
+      )}
       <div className="flex gap-3 pt-4">
         <Button type="button" variant="outline" className="flex-1" onClick={() => isEdit ? setShowEditJenisModal(false) : setShowAddJenisModal(false)}>Batal</Button>
         <Button type="submit" className="flex-1" disabled={formLoading}>{formLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Menyimpan...</> : isEdit ? 'Simpan Perubahan' : 'Simpan'}</Button>
@@ -467,7 +496,7 @@ export default function ManajemenKaryawanPage() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Pengaturan Jam Kerja & Jenis Karyawan</DialogTitle></DialogHeader>
           <div className="mb-4">
-            <Button variant="secondary" onClick={() => { setFormJenis({ nama_jenis: '', jam_masuk: '07:00', jam_pulang: '16:00', toleransi_terlambat: 15 }); setShowAddJenisModal(true); }}>
+            <Button variant="secondary" onClick={() => { setFormJenis({ nama_jenis: '', jam_masuk: '07:00', jam_pulang: '16:00', toleransi_terlambat: 15, is_shift_malam: false, skip_jam_kerja: false }); setShowAddJenisModal(true); }}>
               <Plus className="w-4 h-4 mr-2" /> Tambah Jenis Karyawan
             </Button>
           </div>
@@ -488,10 +517,14 @@ export default function ManajemenKaryawanPage() {
               ) : (
                 jenisKaryawanList.map((j) => (
                   <TableRow key={j.id}>
-                    <TableCell className="font-medium">{j.nama_jenis}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatTime(j.jam_masuk)}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatTime(j.jam_pulang)}</TableCell>
-                    <TableCell className="text-muted-foreground">{j.toleransi_terlambat} menit</TableCell>
+                    <TableCell className="font-medium">
+                      {j.nama_jenis}
+                      {j.skip_jam_kerja && <span className="ml-1 text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded-full">Foto & Lokasi</span>}
+                      {j.is_shift_malam && <span className="ml-1 text-[10px] px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">Shift Malam</span>}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{j.skip_jam_kerja ? '-' : formatTime(j.jam_masuk)}</TableCell>
+                    <TableCell className="text-muted-foreground">{j.skip_jam_kerja ? '-' : formatTime(j.jam_pulang)}</TableCell>
+                    <TableCell className="text-muted-foreground">{j.skip_jam_kerja ? '-' : `${j.toleransi_terlambat} menit`}</TableCell>
                     <TableCell className="text-muted-foreground">{j.jumlah_karyawan} orang</TableCell>
                     <TableCell>
                       <div className="flex gap-1">

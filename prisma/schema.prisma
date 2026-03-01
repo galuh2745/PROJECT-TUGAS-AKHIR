@@ -30,6 +30,8 @@ model JenisKaryawan {
   created_at          DateTime   @default(now())
   updated_at          DateTime   @updatedAt
   toleransi_terlambat Int        @default(15)
+  is_shift_malam      Boolean    @default(false)
+  skip_jam_kerja      Boolean    @default(false)
   karyawan            Karyawan[]
 
   @@map("jenis_karyawan")

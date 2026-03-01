@@ -124,6 +124,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             nama_jenis: true,
+            skip_jam_kerja: true,
           },
         },
       },
@@ -211,6 +212,9 @@ export async function GET(request: NextRequest) {
         (a) => a.karyawan_id === karyawan.id
       );
 
+      // Cek flag jenis karyawan
+      const isSkipJamKerja = (karyawan.jenis_karyawan as any).skip_jam_kerja || false;
+
       // Set tanggal absensi untuk lookup cepat
       const absensiDateSet = new Set(
         absensiKaryawan.map((a) => a.tanggal.toISOString().split('T')[0])
@@ -220,7 +224,9 @@ export async function GET(request: NextRequest) {
       const jumlahHadir = absensiKaryawan.filter(
         (a) => a.status === 'HADIR'
       ).length;
-      const jumlahTerlambat = absensiKaryawan.filter(
+      
+      // Driver/Helper: tidak ada TERLAMBAT
+      const jumlahTerlambat = isSkipJamKerja ? 0 : absensiKaryawan.filter(
         (a) => a.status === 'TERLAMBAT'
       ).length;
       
@@ -235,6 +241,7 @@ export async function GET(request: NextRequest) {
       // Auto-calculate: hitung hari kerja tanpa absensi
       // PENTING: Alpa hanya dihitung mulai dari HARI SETELAH karyawan dibuat (created_at)
       // agar karyawan baru tidak langsung mendapat alpa di hari pembuatan akun
+      // Driver/Helper Driver: TIDAK ada perhitungan ALPHA
       let jumlahAlpha = 0;
       let jumlahIzinExtra = 0;
       let jumlahCutiExtra = 0;
@@ -258,8 +265,10 @@ export async function GET(request: NextRequest) {
         } else if (jenisIzinCuti === 'CUTI') {
           jumlahCutiExtra++;
         } else {
-          // Tidak ada absensi, tidak ada izin/cuti → ALPHA
-          jumlahAlpha++;
+          // Driver/Helper: tidak dihitung ALPHA
+          if (!isSkipJamKerja) {
+            jumlahAlpha++;
+          }
         }
       }
 

@@ -47,6 +47,8 @@ export async function GET() {
       jam_masuk: jk.jam_masuk.toISOString(),
       jam_pulang: jk.jam_pulang.toISOString(),
       toleransi_terlambat: jk.toleransi_terlambat,
+      is_shift_malam: jk.is_shift_malam,
+      skip_jam_kerja: jk.skip_jam_kerja,
       jumlah_karyawan: jk._count.karyawan,
       created_at: jk.created_at.toISOString(),
       updated_at: jk.updated_at.toISOString(),
@@ -70,13 +72,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: validation.error }, { status: validation.status });
     }
 
-    const { nama_jenis, jam_masuk, jam_pulang, toleransi_terlambat } = await req.json();
+    const { nama_jenis, jam_masuk, jam_pulang, toleransi_terlambat, is_shift_malam, skip_jam_kerja } = await req.json();
 
-    // Validasi input
-    if (!nama_jenis || !jam_masuk || !jam_pulang) {
+    // Validasi input - jam masuk/pulang tidak wajib jika skip_jam_kerja = true
+    if (!nama_jenis) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Nama jenis, jam masuk, dan jam pulang harus diisi' 
+        error: 'Nama jenis harus diisi' 
+      }, { status: 400 });
+    }
+
+    if (!skip_jam_kerja && (!jam_masuk || !jam_pulang)) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Jam masuk dan jam pulang harus diisi (kecuali untuk jenis driver/helper)' 
       }, { status: 400 });
     }
 
@@ -92,15 +101,20 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Parse waktu
-    const [jamMasukHour, jamMasukMin] = jam_masuk.split(':').map(Number);
-    const [jamPulangHour, jamPulangMin] = jam_pulang.split(':').map(Number);
+    // Parse waktu (default 00:00 jika skip_jam_kerja)
+    let jamMasukDate = new Date('2000-01-01T00:00:00');
+    let jamPulangDate = new Date('2000-01-01T00:00:00');
     
-    const jamMasukDate = new Date();
-    jamMasukDate.setHours(jamMasukHour, jamMasukMin, 0, 0);
-    
-    const jamPulangDate = new Date();
-    jamPulangDate.setHours(jamPulangHour, jamPulangMin, 0, 0);
+    if (!skip_jam_kerja && jam_masuk && jam_pulang) {
+      const [jamMasukHour, jamMasukMin] = jam_masuk.split(':').map(Number);
+      const [jamPulangHour, jamPulangMin] = jam_pulang.split(':').map(Number);
+      
+      jamMasukDate = new Date();
+      jamMasukDate.setHours(jamMasukHour, jamMasukMin, 0, 0);
+      
+      jamPulangDate = new Date();
+      jamPulangDate.setHours(jamPulangHour, jamPulangMin, 0, 0);
+    }
 
     const jenisKaryawan = await prisma.jenisKaryawan.create({
       data: {
@@ -108,6 +122,8 @@ export async function POST(req: Request) {
         jam_masuk: jamMasukDate,
         jam_pulang: jamPulangDate,
         toleransi_terlambat: toleransi_terlambat || 15,
+        is_shift_malam: is_shift_malam || false,
+        skip_jam_kerja: skip_jam_kerja || false,
       }
     });
 
@@ -133,7 +149,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: false, error: validation.error }, { status: validation.status });
     }
 
-    const { id, nama_jenis, jam_masuk, jam_pulang, toleransi_terlambat } = await req.json();
+    const { id, nama_jenis, jam_masuk, jam_pulang, toleransi_terlambat, is_shift_malam, skip_jam_kerja } = await req.json();
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID harus diisi' }, { status: 400 });
@@ -170,6 +186,8 @@ export async function PUT(req: Request) {
     
     if (nama_jenis) updateData.nama_jenis = nama_jenis.trim();
     if (toleransi_terlambat !== undefined) updateData.toleransi_terlambat = toleransi_terlambat;
+    if (is_shift_malam !== undefined) updateData.is_shift_malam = is_shift_malam;
+    if (skip_jam_kerja !== undefined) updateData.skip_jam_kerja = skip_jam_kerja;
     
     if (jam_masuk) {
       const [h, m] = jam_masuk.split(':').map(Number);

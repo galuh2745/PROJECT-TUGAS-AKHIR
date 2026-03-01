@@ -216,7 +216,31 @@ export async function POST(req: Request) {
     const todayStr = `${year}-${month}-${day}`;
     const today = new Date(todayStr + 'T00:00:00.000Z');
     
-    console.log('Absen masuk - karyawan:', karyawan.nama, ', todayStr:', todayStr);
+    const isShiftMalam = karyawan.jenis_karyawan.is_shift_malam;
+    const isSkipJamKerja = karyawan.jenis_karyawan.skip_jam_kerja;
+    
+    console.log('Absen masuk - karyawan:', karyawan.nama, ', todayStr:', todayStr, ', isShiftMalam:', isShiftMalam, ', skipJamKerja:', isSkipJamKerja);
+
+    // Untuk shift malam: cek apakah ada absensi kemarin yang belum tutup (belum pulang)
+    if (isShiftMalam) {
+      const yesterday = new Date(today);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      
+      const openAbsensiKemarin = await prisma.absensi.findFirst({
+        where: {
+          karyawan_id: karyawan.id,
+          tanggal: yesterday,
+          jam_pulang: null,
+        },
+      });
+
+      if (openAbsensiKemarin) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Anda masih memiliki absensi kemarin yang belum di-checkout. Silakan absen pulang terlebih dahulu.' 
+        }, { status: 400 });
+      }
+    }
 
     // Cek apakah sudah ada absensi hari ini
     const existingAbsensi = await prisma.absensi.findFirst({
@@ -274,8 +298,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Lokasi GPS tidak valid' }, { status: 400 });
     }
     
-    // Validasi lokasi (bisa dinonaktifkan via env)
-    if (!SKIP_LOCATION_CHECK) {
+    // Validasi lokasi (bisa dinonaktifkan via env, atau skip untuk driver/helper)
+    if (!SKIP_LOCATION_CHECK && !isSkipJamKerja) {
       const distance = calculateDistance(latitude, longitude, OFFICE_LAT, OFFICE_LON);
       if (distance > MAX_DISTANCE) {
         return NextResponse.json({ 
@@ -287,14 +311,22 @@ export async function POST(req: Request) {
 
     const currentTime = new Date();
     
-    // Hitung batas waktu toleransi
-    const jamMasukNormal = karyawan.jenis_karyawan.jam_masuk;
-    const toleransi = karyawan.jenis_karyawan.toleransi_terlambat || 15;
+    // Tentukan status absensi
+    let status: string;
     
-    const batasToleransi = new Date();
-    batasToleransi.setHours(jamMasukNormal.getHours(), jamMasukNormal.getMinutes() + toleransi, 0, 0);
-    
-    const status = currentTime <= batasToleransi ? 'HADIR' : 'TERLAMBAT';
+    if (isSkipJamKerja) {
+      // Driver/Helper Driver: selalu HADIR, tidak ada pengecekan jam
+      status = 'HADIR';
+    } else {
+      // Karyawan reguler & shift malam: cek keterlambatan
+      const jamMasukNormal = karyawan.jenis_karyawan.jam_masuk;
+      const toleransi = karyawan.jenis_karyawan.toleransi_terlambat || 15;
+      
+      const batasToleransi = new Date();
+      batasToleransi.setHours(jamMasukNormal.getHours(), jamMasukNormal.getMinutes() + toleransi, 0, 0);
+      
+      status = currentTime <= batasToleransi ? 'HADIR' : 'TERLAMBAT';
+    }
 
     // Proses foto dengan watermark
     const photoBuffer = Buffer.from(await photo.arrayBuffer());
@@ -347,7 +379,7 @@ export async function POST(req: Request) {
       data: {
         karyawan_id: karyawan.id,
         tanggal: today,
-        jam_masuk: currentTime,
+        jam_masuk: isSkipJamKerja ? null : currentTime,
         latitude,
         longitude,
         status,

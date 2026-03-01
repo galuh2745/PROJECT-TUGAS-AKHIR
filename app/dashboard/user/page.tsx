@@ -26,6 +26,8 @@ interface Karyawan {
   jenis_karyawan: string;
   jam_masuk_normal: string;
   jam_pulang_normal: string;
+  is_shift_malam: boolean;
+  skip_jam_kerja: boolean;
 }
 
 interface AbsensiHariIni {
@@ -220,8 +222,9 @@ export default function UserDashboard() {
   }
 
   const absensi = data?.ringkasan.absensi_hari_ini;
-  const sudahMasuk = !!absensi?.jam_masuk;
+  const sudahMasuk = !!absensi?.jam_masuk || (data?.karyawan.skip_jam_kerja && !!absensi);
   const sudahPulang = !!absensi?.jam_pulang;
+  const isSkipJamKerja = data?.karyawan.skip_jam_kerja || false;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -243,7 +246,7 @@ export default function UserDashboard() {
             <CardTitle className="text-base">Aksi Cepat</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className={`grid grid-cols-1 ${isSkipJamKerja ? '' : 'sm:grid-cols-2'} gap-4`}>
               <button
                 onClick={handleAbsenMasuk}
                 disabled={actionLoading || sudahMasuk}
@@ -252,16 +255,21 @@ export default function UserDashboard() {
                 <div className="w-14 h-14 bg-emerald-500 rounded-full flex items-center justify-center mb-3">
                   <LogIn className="w-7 h-7 text-white" />
                 </div>
-                <span className="text-base font-semibold text-emerald-700">Absen Masuk</span>
+                <span className="text-base font-semibold text-emerald-700">
+                  {isSkipJamKerja ? 'Absen Kehadiran' : 'Absen Masuk'}
+                </span>
                 {sudahMasuk ? (
                   <span className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Sudah absen
                   </span>
                 ) : (
-                  <span className="text-xs text-muted-foreground mt-1">Klik untuk absen masuk</span>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {isSkipJamKerja ? 'Foto & lokasi saja' : 'Klik untuk absen masuk'}
+                  </span>
                 )}
               </button>
 
+              {!isSkipJamKerja && (
               <button
                 onClick={handleAbsenPulang}
                 disabled={actionLoading || !sudahMasuk || sudahPulang}
@@ -281,6 +289,7 @@ export default function UserDashboard() {
                   <span className="text-xs text-muted-foreground mt-1">Klik untuk absen pulang</span>
                 )}
               </button>
+              )}
             </div>
 
             {actionLoading && (
@@ -328,6 +337,7 @@ export default function UserDashboard() {
                       {absensi.status}
                     </span>
                   </div>
+                  {!isSkipJamKerja && (
                   <div className="space-y-1 mt-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Masuk:</span>
@@ -338,6 +348,13 @@ export default function UserDashboard() {
                       <span className="font-medium">{formatTime(absensi.jam_pulang)}</span>
                     </div>
                   </div>
+                  )}
+                  {isSkipJamKerja && (
+                  <div className="mt-3 text-sm text-muted-foreground text-center">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    Absen dengan foto & lokasi
+                  </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-center py-4 text-muted-foreground">Belum absen hari ini</p>
@@ -379,22 +396,22 @@ export default function UserDashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Tanggal</TableHead>
-                      <TableHead>Jam Masuk</TableHead>
-                      <TableHead>Jam Pulang</TableHead>
+                      {!isSkipJamKerja && <TableHead>Jam Masuk</TableHead>}
+                      {!isSkipJamKerja && <TableHead>Jam Pulang</TableHead>}
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data?.riwayat.absensi.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Belum ada data absensi</TableCell>
+                        <TableCell colSpan={isSkipJamKerja ? 2 : 4} className="text-center py-8 text-muted-foreground">Belum ada data absensi</TableCell>
                       </TableRow>
                     ) : (
                       data?.riwayat.absensi.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell>{formatDate(item.tanggal)}</TableCell>
-                          <TableCell className="text-muted-foreground">{formatTime(item.jam_masuk)}</TableCell>
-                          <TableCell className="text-muted-foreground">{formatTime(item.jam_pulang)}</TableCell>
+                          {!isSkipJamKerja && <TableCell className="text-muted-foreground">{formatTime(item.jam_masuk)}</TableCell>}
+                          {!isSkipJamKerja && <TableCell className="text-muted-foreground">{formatTime(item.jam_pulang)}</TableCell>}
                           <TableCell>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusVariant(item.status)}`}>
                               {item.status}

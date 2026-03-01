@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
       where: whereKaryawan,
       include: {
         jenis_karyawan: {
-          select: { nama_jenis: true },
+          select: { nama_jenis: true, skip_jam_kerja: true },
         },
       },
       orderBy: { nama: 'asc' },
@@ -161,8 +161,10 @@ export async function GET(request: NextRequest) {
           absensiKaryawan.map((a) => a.tanggal.toISOString().split('T')[0])
         );
 
+        const isSkipJamKerja = (karyawan.jenis_karyawan as any).skip_jam_kerja || false;
+
         const hadir = absensiKaryawan.filter((a) => a.status === 'HADIR').length;
-        const terlambat = absensiKaryawan.filter((a) => a.status === 'TERLAMBAT').length;
+        const terlambat = isSkipJamKerja ? 0 : absensiKaryawan.filter((a) => a.status === 'TERLAMBAT').length;
         let izin = absensiKaryawan.filter((a) => a.status === 'IZIN').length;
         let cuti = absensiKaryawan.filter((a) => a.status === 'CUTI').length;
         let alpha = 0;
@@ -181,7 +183,7 @@ export async function GET(request: NextRequest) {
           const jenis = isDateCoveredByIzinCuti(karyawan.id, hk);
           if (jenis === 'IZIN' || jenis === 'SAKIT') izin++;
           else if (jenis === 'CUTI') cuti++;
-          else alpha++;
+          else if (!isSkipJamKerja) alpha++;
         }
 
         return {
