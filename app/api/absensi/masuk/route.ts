@@ -254,22 +254,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Sudah melakukan check-in hari ini' }, { status: 400 });
     }
 
-    // Cek apakah ada izin/cuti yang disetujui untuk hari ini
-    const approvedIzinCuti = await prisma.izinCuti.findFirst({
-      where: {
-        karyawan_id: karyawan.id,
-        status: 'APPROVED',
-        tanggal_mulai: { lte: today },
-        tanggal_selesai: { gte: today },
-      },
-    });
-
-    if (approvedIzinCuti) {
-      return NextResponse.json({ 
-        success: false, 
-        error: `Tidak dapat melakukan absensi. Anda sedang ${approvedIzinCuti.jenis.toLowerCase()} yang telah disetujui` 
-      }, { status: 400 });
-    }
+    // Izin/cuti yang disetujui TIDAK memblokir absensi.
+    // Jika karyawan tetap masuk kerja, absensi diizinkan (override izin/cuti).
+    // Rekap bulanan akan menghitung berdasarkan record absensi yang ada.
 
     // Parse FormData
     const formData = await req.formData();
