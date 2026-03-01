@@ -20,6 +20,7 @@ echo "🚀 DEPLOY STARTED - $(date)"
 cd $APP_DIR
 
 echo "📥 Pull latest code"
+git checkout -- .
 git pull origin main
 
 echo "📦 Install dependency"
