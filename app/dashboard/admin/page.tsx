@@ -216,7 +216,7 @@ export default function AdminDashboard() {
         <div className="relative flex items-center justify-between">
           <div className="space-y-1.5">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Halo, Admin 👋
+              Halo, Admin 😁
             </h1>
             <p className="text-blue-100 text-sm sm:text-base max-w-md">
               Selamat datang di Sistem Absensi,Inventory, & Keuangan CV Aswi Sentosa Lampung
