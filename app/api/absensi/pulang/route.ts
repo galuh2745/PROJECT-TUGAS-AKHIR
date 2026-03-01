@@ -29,15 +29,6 @@ export async function POST(req: Request) {
     }
 
     const isShiftMalam = karyawan.jenis_karyawan.is_shift_malam;
-    const isSkipJamKerja = karyawan.jenis_karyawan.skip_jam_kerja;
-
-    // Driver/Helper Driver tidak perlu absen pulang
-    if (isSkipJamKerja) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Jenis karyawan Anda tidak memerlukan absen pulang' 
-      }, { status: 400 });
-    }
 
     // Gunakan tanggal lokal (konsisten dengan absensi masuk)
     const now = new Date();

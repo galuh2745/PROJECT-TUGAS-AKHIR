@@ -246,7 +246,7 @@ export default function UserDashboard() {
             <CardTitle className="text-base">Aksi Cepat</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`grid grid-cols-1 ${isSkipJamKerja ? '' : 'sm:grid-cols-2'} gap-4`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
                 onClick={handleAbsenMasuk}
                 disabled={actionLoading || sudahMasuk}
@@ -269,7 +269,6 @@ export default function UserDashboard() {
                 )}
               </button>
 
-              {!isSkipJamKerja && (
               <button
                 onClick={handleAbsenPulang}
                 disabled={actionLoading || !sudahMasuk || sudahPulang}
@@ -284,12 +283,15 @@ export default function UserDashboard() {
                     <CheckCircle2 className="w-3.5 h-3.5" /> Sudah absen
                   </span>
                 ) : !sudahMasuk ? (
-                  <span className="text-xs text-muted-foreground mt-1">Absen masuk dulu</span>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {isSkipJamKerja ? 'Absen kehadiran dulu' : 'Absen masuk dulu'}
+                  </span>
                 ) : (
-                  <span className="text-xs text-muted-foreground mt-1">Klik untuk absen pulang</span>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {isSkipJamKerja ? 'Foto & lokasi saja' : 'Klik untuk absen pulang'}
+                  </span>
                 )}
               </button>
-              )}
             </div>
 
             {actionLoading && (
