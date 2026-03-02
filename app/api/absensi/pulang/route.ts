@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     }
 
     const isShiftMalam = karyawan.jenis_karyawan.is_shift_malam;
+    const isSkipJamKerja = (karyawan.jenis_karyawan as any).skip_jam_kerja || false;
 
     // Gunakan tanggal lokal (konsisten dengan absensi masuk)
     const now = new Date();
@@ -38,28 +39,47 @@ export async function POST(req: Request) {
     const todayStr = `${year}-${month}-${day}`;
     const today = new Date(todayStr + 'T00:00:00.000Z');
 
-    let absensi = await prisma.absensi.findFirst({
-      where: {
-        karyawan_id: karyawan.id,
-        tanggal: today,
-      },
-    });
+    let absensi;
 
-    // Shift malam: jika tidak ada absensi hari ini, cek kemarin (cross-midnight)
-    if (!absensi && isShiftMalam) {
-      const yesterday = new Date(today);
-      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-      
+    if (isSkipJamKerja) {
+      // Driver/Helper: cari absensi TERAKHIR yang belum checkout (tanpa batasan tanggal)
+      // Ini menangani cross-midnight: masuk hari ini, pulang besok/lusa
       absensi = await prisma.absensi.findFirst({
         where: {
           karyawan_id: karyawan.id,
-          tanggal: yesterday,
-          jam_pulang: null, // hanya yang belum checkout
+          jam_pulang: null,
         },
+        orderBy: { tanggal: 'desc' },
       });
 
       if (absensi) {
-        console.log(`Shift malam cross-midnight: karyawan ${karyawan.nama} absen pulang untuk tanggal ${yesterday.toISOString().split('T')[0]}`);
+        console.log(`Driver/Helper checkout: karyawan ${karyawan.nama} absen pulang untuk tanggal ${absensi.tanggal.toISOString().split('T')[0]}`);
+      }
+    } else {
+      // Karyawan reguler: cari absensi hari ini
+      absensi = await prisma.absensi.findFirst({
+        where: {
+          karyawan_id: karyawan.id,
+          tanggal: today,
+        },
+      });
+
+      // Shift malam: jika tidak ada absensi hari ini, cek kemarin (cross-midnight)
+      if (!absensi && isShiftMalam) {
+        const yesterday = new Date(today);
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+        
+        absensi = await prisma.absensi.findFirst({
+          where: {
+            karyawan_id: karyawan.id,
+            tanggal: yesterday,
+            jam_pulang: null,
+          },
+        });
+
+        if (absensi) {
+          console.log(`Shift malam cross-midnight: karyawan ${karyawan.nama} absen pulang untuk tanggal ${yesterday.toISOString().split('T')[0]}`);
+        }
       }
     }
 

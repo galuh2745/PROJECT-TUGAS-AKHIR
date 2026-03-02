@@ -76,22 +76,38 @@ export async function GET(req: Request) {
       },
     });
 
-    // Shift malam: jika belum ada absensi hari ini, cek kemarin (cross-midnight)
-    // Ini untuk menampilkan status "sudah masuk" di dashboard pagi hari
-    if (!absensiHariIni && karyawan.jenis_karyawan.is_shift_malam) {
-      const yesterday = new Date(today);
-      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    // Shift malam & Driver/Helper: jika belum ada absensi hari ini, cek absensi yang belum checkout
+    // Ini untuk menampilkan status "sudah masuk" di dashboard
+    if (!absensiHariIni && (karyawan.jenis_karyawan.is_shift_malam || (karyawan.jenis_karyawan as any).skip_jam_kerja)) {
+      const isSkipJam = (karyawan.jenis_karyawan as any).skip_jam_kerja || false;
       
-      const openAbsensiKemarin = await prisma.absensi.findFirst({
-        where: {
-          karyawan_id: karyawan.id,
-          tanggal: yesterday,
-          jam_pulang: null, // belum checkout
-        },
-      });
-
-      if (openAbsensiKemarin) {
-        absensiHariIni = openAbsensiKemarin;
+      if (isSkipJam) {
+        // Driver/Helper: cari absensi TERAKHIR yang belum checkout (tanpa batasan tanggal)
+        const openAbsensi = await prisma.absensi.findFirst({
+          where: {
+            karyawan_id: karyawan.id,
+            jam_pulang: null,
+          },
+          orderBy: { tanggal: 'desc' },
+        });
+        if (openAbsensi) {
+          absensiHariIni = openAbsensi;
+        }
+      } else {
+        // Shift malam: cek kemarin saja
+        const yesterday = new Date(today);
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+        
+        const openAbsensiKemarin = await prisma.absensi.findFirst({
+          where: {
+            karyawan_id: karyawan.id,
+            tanggal: yesterday,
+            jam_pulang: null,
+          },
+        });
+        if (openAbsensiKemarin) {
+          absensiHariIni = openAbsensiKemarin;
+        }
       }
     }
 

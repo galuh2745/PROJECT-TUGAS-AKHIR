@@ -221,23 +221,28 @@ export async function POST(req: Request) {
     
     console.log('Absen masuk - karyawan:', karyawan.nama, ', todayStr:', todayStr, ', isShiftMalam:', isShiftMalam, ', skipJamKerja:', isSkipJamKerja);
 
-    // Untuk shift malam: cek apakah ada absensi kemarin yang belum tutup (belum pulang)
-    if (isShiftMalam) {
-      const yesterday = new Date(today);
-      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-      
-      const openAbsensiKemarin = await prisma.absensi.findFirst({
+    // Untuk shift malam & driver/helper: cek apakah ada absensi yang belum tutup (belum pulang)
+    if (isShiftMalam || isSkipJamKerja) {
+      // Driver/Helper: cari absensi TERAKHIR yang belum checkout (tanpa batasan tanggal)
+      // Shift malam: cek kemarin saja
+      const openAbsensi = await prisma.absensi.findFirst({
         where: {
           karyawan_id: karyawan.id,
-          tanggal: yesterday,
           jam_pulang: null,
+          ...(isSkipJamKerja ? {} : {
+            tanggal: {
+              gte: new Date(new Date(today).setUTCDate(today.getUTCDate() - 1)),
+              lt: today,
+            },
+          }),
         },
+        orderBy: { tanggal: 'desc' },
       });
 
-      if (openAbsensiKemarin) {
+      if (openAbsensi) {
         return NextResponse.json({ 
           success: false, 
-          error: 'Anda masih memiliki absensi kemarin yang belum di-checkout. Silakan absen pulang terlebih dahulu.' 
+          error: 'Anda masih memiliki absensi yang belum di-checkout. Silakan absen pulang terlebih dahulu.' 
         }, { status: 400 });
       }
     }
