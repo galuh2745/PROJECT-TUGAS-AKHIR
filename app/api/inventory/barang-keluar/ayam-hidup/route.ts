@@ -699,7 +699,7 @@ export async function PUT(req: Request) {
       message: 'Barang keluar ayam hidup berhasil diupdate',
       data: {
         id: updated.id.toString(),
-        grand_total: grandTotal,
+        total_bersih: parseFloat(updated.total_bersih.toString()),
         updated_at: updated.updated_at.toISOString(),
       }
     });
