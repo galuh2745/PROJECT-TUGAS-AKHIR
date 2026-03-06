@@ -301,9 +301,9 @@ export async function POST(req: Request) {
       };
     });
 
-    // Override with custom price if provided
+    // Add harga bis if provided
     if (total_penjualan_custom && parseFloat(total_penjualan_custom) > 0) {
-      totalPenjualan = parseFloat(total_penjualan_custom);
+      totalPenjualan += parseFloat(total_penjualan_custom);
     }
 
     const pengeluaranVal = pengeluaran || 0;
@@ -600,9 +600,9 @@ export async function PUT(req: Request) {
       };
     });
 
-    // Override with custom price if provided
+    // Add harga bis if provided
     if (total_penjualan_custom && parseFloat(total_penjualan_custom) > 0) {
-      totalPenjualan = parseFloat(total_penjualan_custom);
+      totalPenjualan += parseFloat(total_penjualan_custom);
     }
 
     const pengeluaranVal = pengeluaran || 0;

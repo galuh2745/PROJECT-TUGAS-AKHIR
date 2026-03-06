@@ -344,9 +344,11 @@ export async function POST(req: Request) {
 
     // Hitung nilai otomatis
     const biayaBubutPost = is_bubut ? (parseFloat(harga_bubut) || 0) * parseInt(jumlah_ekor) : 0;
-    const total_penjualan = (total_penjualan_custom && parseFloat(total_penjualan_custom) > 0)
+    const baseTotal = (harga_per_kg * total_kg) + biayaBubutPost;
+    const biayaBis = (total_penjualan_custom && parseFloat(total_penjualan_custom) > 0)
       ? parseFloat(total_penjualan_custom)
-      : (harga_per_kg * total_kg) + biayaBubutPost;
+      : 0;
+    const total_penjualan = baseTotal + biayaBis;
     const pengeluaranVal = pengeluaran || 0;
     const total_bersih = total_penjualan - pengeluaranVal;
 
@@ -653,9 +655,11 @@ export async function PUT(req: Request) {
 
     // Hitung nilai otomatis
     const biayaBubut = is_bubut ? (parseFloat(harga_bubut) || 0) * parseInt(jumlah_ekor) : 0;
-    const total_penjualan = (total_penjualan_custom && parseFloat(total_penjualan_custom) > 0)
+    const baseTotalPut = (harga_per_kg * total_kg) + biayaBubut;
+    const biayaBisPut = (total_penjualan_custom && parseFloat(total_penjualan_custom) > 0)
       ? parseFloat(total_penjualan_custom)
-      : (harga_per_kg * total_kg) + biayaBubut;
+      : 0;
+    const total_penjualan = baseTotalPut + biayaBisPut;
     const pengeluaranVal = pengeluaran || 0;
     const total_bersih = total_penjualan - pengeluaranVal;
     const namaCustomer = nama_customer?.trim() || customer.nama;

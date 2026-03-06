@@ -44,7 +44,7 @@ export default function BarangKeluarAyamHidupPage() {
     perusahaan_id: '', tanggal: '', customer_id: '', jumlah_ekor: '', total_kg: '',
     jenis_daging: 'BESAR' as 'JUMBO' | 'BESAR' | 'KECIL', harga_per_kg: '', pengeluaran: '',
     jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang',
-    is_bubut: false, harga_bubut: '', is_harga_custom: false, harga_custom: '', keterangan: '',
+    is_bubut: false, harga_bubut: '', is_harga_bis: false, harga_bis: '', keterangan: '',
   });
 
   useEffect(() => { fetchPerusahaan(); fetchStok(); fetchCustomers(); }, []);
@@ -64,22 +64,23 @@ export default function BarangKeluarAyamHidupPage() {
   const openAddModal = () => {
     setModalMode('add'); setSelectedData(null);
     const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    setFormData({ perusahaan_id: '', tanggal: localDate, customer_id: '', jumlah_ekor: '', total_kg: '', jenis_daging: 'BESAR', harga_per_kg: '', pengeluaran: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang', is_bubut: false, harga_bubut: '', is_harga_custom: false, harga_custom: '', keterangan: '' });
+    setFormData({ perusahaan_id: '', tanggal: localDate, customer_id: '', jumlah_ekor: '', total_kg: '', jenis_daging: 'BESAR', harga_per_kg: '', pengeluaran: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang', is_bubut: false, harga_bubut: '', is_harga_bis: false, harga_bis: '', keterangan: '' });
     setShowModal(true);
   };
   const openEditModal = (item: BarangKeluarAyamHidup) => {
     setModalMode('edit'); setSelectedData(item);
     const matchedCustomer = customerList.find(c => c.nama === item.nama_customer);
     const tipePembayaran = ((item.jumlah_bayar ?? 0) === 0 ? 'hutang' : (item.jumlah_bayar ?? 0) >= item.total_penjualan ? 'lunas' : 'sebagian') as 'lunas' | 'sebagian' | 'hutang';
-    setFormData({ perusahaan_id: item.perusahaan_id, tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), jenis_daging: item.jenis_daging, harga_per_kg: item.harga_per_kg.toString(), pengeluaran: item.pengeluaran.toString(), jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran, is_bubut: item.is_bubut || false, harga_bubut: item.harga_bubut ? item.harga_bubut.toString() : '', is_harga_custom: false, harga_custom: '', keterangan: item.keterangan || '' });
+    setFormData({ perusahaan_id: item.perusahaan_id, tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', jumlah_ekor: item.jumlah_ekor.toString(), total_kg: item.total_kg.toString(), jenis_daging: item.jenis_daging, harga_per_kg: item.harga_per_kg.toString(), pengeluaran: item.pengeluaran.toString(), jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran, is_bubut: item.is_bubut || false, harga_bubut: item.harga_bubut ? item.harga_bubut.toString() : '', is_harga_bis: false, harga_bis: '', keterangan: item.keterangan || '' });
     setShowModal(true);
   };
 
   const calculatedBiayaBubut = useMemo(() => formData.is_bubut ? (parseFloat(formData.harga_bubut) || 0) * (parseInt(formData.jumlah_ekor) || 0) : 0, [formData.is_bubut, formData.harga_bubut, formData.jumlah_ekor]);
   const calculatedTotalPenjualan = useMemo(() => {
-    if (formData.is_harga_custom && formData.harga_custom) return parseFloat(formData.harga_custom) || 0;
-    return ((parseFloat(formData.total_kg) || 0) * (parseFloat(formData.harga_per_kg) || 0)) + calculatedBiayaBubut;
-  }, [formData.total_kg, formData.harga_per_kg, calculatedBiayaBubut, formData.is_harga_custom, formData.harga_custom]);
+    const base = ((parseFloat(formData.total_kg) || 0) * (parseFloat(formData.harga_per_kg) || 0)) + calculatedBiayaBubut;
+    const biayaBis = (formData.is_harga_bis && formData.harga_bis) ? (parseFloat(formData.harga_bis) || 0) : 0;
+    return base + biayaBis;
+  }, [formData.total_kg, formData.harga_per_kg, calculatedBiayaBubut, formData.is_harga_bis, formData.harga_bis]);
   const calculatedTotalBersih = useMemo(() => calculatedTotalPenjualan - (parseFloat(formData.pengeluaran) || 0), [calculatedTotalPenjualan, formData.pengeluaran]);
   const calculatedJumlahBayar = useMemo(() => {
     if (formData.tipe_pembayaran === 'hutang') return 0;
@@ -117,7 +118,7 @@ export default function BarangKeluarAyamHidupPage() {
         metode_pembayaran: formData.metode_pembayaran,
         is_bubut: formData.is_bubut,
         harga_bubut: formData.is_bubut ? (parseFloat(formData.harga_bubut) || 0) : 0,
-        total_penjualan_custom: formData.is_harga_custom ? (parseFloat(formData.harga_custom) || 0) : undefined,
+        total_penjualan_custom: formData.is_harga_bis ? (parseFloat(formData.harga_bis) || 0) : undefined,
         keterangan: formData.keterangan || '',
       };
       const r = await fetch('/api/inventory/barang-keluar/ayam-hidup', { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
@@ -246,21 +247,21 @@ export default function BarangKeluarAyamHidupPage() {
               )}
             </div>
 
-            {/* Harga Custom Section - Khusus Customer Bagus */}
+            {/* Harga Bis Section - Khusus Customer Bagus */}
             {customerList.find(c => c.id === formData.customer_id)?.nama?.toLowerCase().includes('bagus') && (
               <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold text-emerald-800 text-sm">Harga Custom (Isi Manual)</p>
-                  <button type="button" onClick={() => setFormData({ ...formData, is_harga_custom: !formData.is_harga_custom, harga_custom: '' })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.is_harga_custom ? 'bg-emerald-600' : 'bg-gray-300'}`}>
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_harga_custom ? 'translate-x-6' : 'translate-x-1'}`} />
+                  <p className="font-semibold text-emerald-800 text-sm">Harga Bis</p>
+                  <button type="button" onClick={() => setFormData({ ...formData, is_harga_bis: !formData.is_harga_bis, harga_bis: '' })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.is_harga_bis ? 'bg-emerald-600' : 'bg-gray-300'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.is_harga_bis ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
-                {formData.is_harga_custom && (
+                {formData.is_harga_bis && (
                   <div className="space-y-2">
-                    <Label className="text-xs">Total Harga Custom <span className="text-red-500">*</span></Label>
-                    <Input type="number" placeholder="Masukkan total harga" value={formData.harga_custom} onChange={(e) => setFormData({ ...formData, harga_custom: e.target.value })} min={1} required />
-                    <p className="text-xs text-emerald-600">Total penjualan akan menggunakan harga yang diisi manual, bukan dari perhitungan otomatis</p>
+                    <Label className="text-xs">Harga Bis <span className="text-red-500">*</span></Label>
+                    <Input type="number" placeholder="Masukkan harga bis" value={formData.harga_bis} onChange={(e) => setFormData({ ...formData, harga_bis: e.target.value })} min={1} required />
+                    <p className="text-xs text-emerald-600">Harga bis akan ditambahkan ke total harga daging/ayam</p>
                   </div>
                 )}
               </div>
