@@ -40,7 +40,7 @@ export default function BarangKeluarDagingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [viewingData, setViewingData] = useState<BarangKeluarDaging | null>(null);
-  const [formHeader, setFormHeader] = useState({ tanggal: '', customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang' });
+  const [formHeader, setFormHeader] = useState({ tanggal: '', customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang', is_harga_custom: false, harga_custom: '' });
   const [formDetails, setFormDetails] = useState<DetailItem[]>([{ jenis_daging_id: '', berat_kg: '', harga_per_kg: '', subtotal: 0 }]);
 
   useEffect(() => { fetchJenisDaging(); fetchCustomers(); }, []);
@@ -58,7 +58,7 @@ export default function BarangKeluarDagingPage() {
   const openAddModal = () => {
     setModalMode('add'); setSelectedData(null);
     const now = new Date(); const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    setFormHeader({ tanggal: localDate, customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang' });
+    setFormHeader({ tanggal: localDate, customer_id: '', pengeluaran: '', keterangan: '', jumlah_bayar: '', metode_pembayaran: 'CASH', tipe_pembayaran: 'hutang' as 'lunas' | 'sebagian' | 'hutang', is_harga_custom: false, harga_custom: '' });
     setFormDetails([{ jenis_daging_id: '', berat_kg: '', harga_per_kg: '', subtotal: 0 }]);
     setShowModal(true);
   };
@@ -67,7 +67,7 @@ export default function BarangKeluarDagingPage() {
     setModalMode('edit'); setSelectedData(item);
     const matchedCustomer = customerList.find(c => c.nama === item.nama_customer);
     const tipePembayaran = ((item.jumlah_bayar ?? 0) === 0 ? 'hutang' : (item.jumlah_bayar ?? 0) >= item.total_penjualan ? 'lunas' : 'sebagian') as 'lunas' | 'sebagian' | 'hutang';
-    setFormHeader({ tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', pengeluaran: item.pengeluaran.toString(), keterangan: item.keterangan || '', jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran });
+    setFormHeader({ tanggal: item.tanggal, customer_id: matchedCustomer?.id || '', pengeluaran: item.pengeluaran.toString(), keterangan: item.keterangan || '', jumlah_bayar: tipePembayaran === 'sebagian' ? (item.jumlah_bayar ?? 0).toString() : '', metode_pembayaran: 'CASH', tipe_pembayaran: tipePembayaran, is_harga_custom: false, harga_custom: '' });
     setFormDetails(item.details.map(d => ({ jenis_daging_id: d.jenis_daging_id || d.jenis_daging.id, berat_kg: d.berat_kg.toString(), harga_per_kg: d.harga_per_kg.toString(), subtotal: d.subtotal })));
     setShowModal(true);
   };
@@ -82,7 +82,10 @@ export default function BarangKeluarDagingPage() {
     setFormDetails(updated);
   };
 
-  const calculatedTotal = useMemo(() => formDetails.reduce((s, d) => s + d.subtotal, 0), [formDetails]);
+  const calculatedTotal = useMemo(() => {
+    if (formHeader.is_harga_custom && formHeader.harga_custom) return parseFloat(formHeader.harga_custom) || 0;
+    return formDetails.reduce((s, d) => s + d.subtotal, 0);
+  }, [formDetails, formHeader.is_harga_custom, formHeader.harga_custom]);
   const calculatedSaldo = useMemo(() => calculatedTotal - (parseFloat(formHeader.pengeluaran) || 0), [calculatedTotal, formHeader.pengeluaran]);
   const calculatedJumlahBayar = useMemo(() => { if (formHeader.tipe_pembayaran === 'hutang') return 0; if (formHeader.tipe_pembayaran === 'lunas') return calculatedTotal; const val = parseFloat(formHeader.jumlah_bayar); return isNaN(val) ? 0 : val; }, [formHeader.tipe_pembayaran, formHeader.jumlah_bayar, calculatedTotal]);
   const calculatedSisaPiutang = useMemo(() => Math.max(0, calculatedTotal - calculatedJumlahBayar), [calculatedTotal, calculatedJumlahBayar]);
@@ -147,7 +150,7 @@ export default function BarangKeluarDagingPage() {
     try {
       const method = modalMode === 'add' ? 'POST' : 'PUT';
       const selectedCustomer = customerList.find(c => c.id === formHeader.customer_id);
-      const body = { ...(modalMode === 'edit' && { id: selectedData?.id }), tanggal: formHeader.tanggal, customer_id: formHeader.customer_id, nama_customer: selectedCustomer?.nama || '', pengeluaran: parseFloat(formHeader.pengeluaran) || 0, keterangan: formHeader.keterangan, jumlah_bayar: calculatedJumlahBayar, metode_pembayaran: formHeader.metode_pembayaran, details: formDetails.map(d => ({ jenis_daging_id: d.jenis_daging_id, berat_kg: parseFloat(d.berat_kg) || 0, harga_per_kg: parseFloat(d.harga_per_kg) || 0 })) };
+      const body = { ...(modalMode === 'edit' && { id: selectedData?.id }), tanggal: formHeader.tanggal, customer_id: formHeader.customer_id, nama_customer: selectedCustomer?.nama || '', pengeluaran: parseFloat(formHeader.pengeluaran) || 0, keterangan: formHeader.keterangan, jumlah_bayar: calculatedJumlahBayar, metode_pembayaran: formHeader.metode_pembayaran, total_penjualan_custom: formHeader.is_harga_custom ? (parseFloat(formHeader.harga_custom) || 0) : undefined, details: formDetails.map(d => ({ jenis_daging_id: d.jenis_daging_id, berat_kg: parseFloat(d.berat_kg) || 0, harga_per_kg: parseFloat(d.harga_per_kg) || 0 })) };
       const r = await fetch('/api/inventory/barang-keluar/daging', { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
       const res = await r.json(); if (res.success) { toast.success('Data berhasil disimpan'); setShowModal(false); fetchData(); } else toast.error(res.error);
     } catch { toast.error('Terjadi kesalahan'); } finally { setSubmitting(false); }
@@ -338,6 +341,26 @@ export default function BarangKeluarDagingPage() {
                 );
               })}
             </div>
+
+            {/* Harga Custom Section - Khusus Customer Bagus */}
+            {customerList.find(c => c.id === formHeader.customer_id)?.nama?.toLowerCase().includes('bagus') && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-emerald-800 text-sm">Harga Custom (Isi Manual)</p>
+                  <button type="button" onClick={() => setFormHeader({ ...formHeader, is_harga_custom: !formHeader.is_harga_custom, harga_custom: '' })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formHeader.is_harga_custom ? 'bg-emerald-600' : 'bg-gray-300'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formHeader.is_harga_custom ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                {formHeader.is_harga_custom && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Total Harga Custom <span className="text-red-500">*</span></Label>
+                    <Input type="number" placeholder="Masukkan total harga" value={formHeader.harga_custom} onChange={(e) => setFormHeader({ ...formHeader, harga_custom: e.target.value })} min={1} required />
+                    <p className="text-xs text-emerald-600">Total penjualan akan menggunakan harga yang diisi manual, bukan dari perhitungan detail</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Payment Section */}
             <div className="rounded-md border border-amber-200 bg-amber-50/50 p-4 space-y-3">

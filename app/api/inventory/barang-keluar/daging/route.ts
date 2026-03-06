@@ -251,7 +251,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { tanggal, nama_customer, customer_id, pengeluaran, keterangan, details, jumlah_bayar, metode_pembayaran } = body;
+    const { tanggal, nama_customer, customer_id, pengeluaran, keterangan, details, jumlah_bayar, metode_pembayaran, total_penjualan_custom } = body;
     const bayarVal = parseFloat(jumlah_bayar) || 0;
     const metodeVal = metode_pembayaran || null;
 
@@ -300,6 +300,11 @@ export async function POST(req: Request) {
         subtotal: new Decimal(subtotal.toFixed(2)),
       };
     });
+
+    // Override with custom price if provided
+    if (total_penjualan_custom && parseFloat(total_penjualan_custom) > 0) {
+      totalPenjualan = parseFloat(total_penjualan_custom);
+    }
 
     const pengeluaranVal = pengeluaran || 0;
     const saldo = totalPenjualan - pengeluaranVal;
@@ -534,7 +539,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { id, tanggal, nama_customer, customer_id, pengeluaran, keterangan, details } = body;
+    const { id, tanggal, nama_customer, customer_id, pengeluaran, keterangan, details, total_penjualan_custom } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID wajib diisi' }, { status: 400 });
@@ -594,6 +599,11 @@ export async function PUT(req: Request) {
         subtotal: new Decimal(subtotal.toFixed(2)),
       };
     });
+
+    // Override with custom price if provided
+    if (total_penjualan_custom && parseFloat(total_penjualan_custom) > 0) {
+      totalPenjualan = parseFloat(total_penjualan_custom);
+    }
 
     const pengeluaranVal = pengeluaran || 0;
     const saldo = totalPenjualan - pengeluaranVal;
