@@ -38,8 +38,7 @@ export async function GET(req: Request) {
     const status = searchParams.get('status'); // lunas | hutang | sebagian | all
 
     const whereClause: Prisma.PenjualanWhereInput = {
-      // Exclude drafts from riwayat list
-      status: { not: 'draft' },
+
     };
 
     if (tanggal_dari || tanggal_sampai) {

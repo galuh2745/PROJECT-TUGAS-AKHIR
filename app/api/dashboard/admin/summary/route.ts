@@ -91,46 +91,58 @@ export async function GET(req: Request) {
       (totalKeluarAll._sum.jumlah_ekor ?? 0);
 
     // ════════════════════════════════════════════════════
-    // 3) KEUANGAN
+    // 3) KEUANGAN (konsisten dengan /api/keuangan/harian)
+    // Pemasukan = SEMUA pembayaran hari ini (termasuk pelunasan piutang)
     // ════════════════════════════════════════════════════
 
-    const [penjualanDagingAgg, penjualanHidupAgg, beliAyamAgg, pengeluaranDagingAgg, pengeluaranHidupAgg] =
+    const [pembayaranHarianAgg, beliAyamAgg] =
       await Promise.all([
-        // Pemasukan – penjualan daging (saldo = total_penjualan - pengeluaran for daging)
-        prisma.barangKeluarDaging.aggregate({
-          where: { tanggal: { gte: targetDate, lt: nextDate } },
-          _sum: { total_penjualan: true },
-        }),
-        // Pemasukan – penjualan ayam hidup
-        prisma.barangKeluarAyamHidup.aggregate({
-          where: { tanggal: { gte: targetDate, lt: nextDate } },
-          _sum: { total_penjualan: true },
+        // Kas masuk – SEMUA pembayaran hari ini (termasuk pelunasan hutang lama)
+        prisma.pembayaranPiutang.aggregate({
+          where: {
+            tanggal: { gte: targetDate, lt: nextDate },
+          },
+          _sum: { jumlah_bayar: true },
         }),
         // Pengeluaran – beli ayam
         prisma.barangMasuk.aggregate({
           where: { tanggal_masuk: { gte: targetDate, lt: nextDate } },
           _sum: { total_harga: true },
         }),
-        // Pengeluaran operasional daging
-        prisma.barangKeluarDaging.aggregate({
-          where: { tanggal: { gte: targetDate, lt: nextDate } },
-          _sum: { pengeluaran: true },
-        }),
-        // Pengeluaran operasional ayam hidup
-        prisma.barangKeluarAyamHidup.aggregate({
-          where: { tanggal: { gte: targetDate, lt: nextDate } },
-          _sum: { pengeluaran: true },
-        }),
       ]);
 
+    // Hitung kerugian ayam mati (tidak bisa claim)
+    const ayamMatiTidakBisaClaim = await prisma.ayamMati.findMany({
+      where: {
+        tanggal: { gte: targetDate, lt: nextDate },
+        status_claim: 'TIDAK_BISA',
+      },
+    });
+
+    let totalKerugianAyamMati = 0;
+    for (const am of ayamMatiTidakBisaClaim) {
+      const barangMasukRef = await prisma.barangMasuk.findFirst({
+        where: {
+          perusahaan_id: am.perusahaan_id,
+          tanggal_masuk: { lte: am.tanggal },
+        },
+        orderBy: { tanggal_masuk: 'desc' },
+      });
+      if (barangMasukRef) {
+        const totalKg = parseFloat(barangMasukRef.total_kg.toString());
+        const jumlahEkor = barangMasukRef.jumlah_ekor;
+        const hargaPerKg = parseFloat(barangMasukRef.harga_per_kg.toString());
+        const bw = jumlahEkor > 0 ? totalKg / jumlahEkor : 0;
+        totalKerugianAyamMati += am.jumlah_ekor * bw * hargaPerKg;
+      }
+    }
+
     const pemasukan =
-      parseFloat(penjualanDagingAgg._sum.total_penjualan?.toString() ?? '0') +
-      parseFloat(penjualanHidupAgg._sum.total_penjualan?.toString() ?? '0');
+      parseFloat(pembayaranHarianAgg._sum.jumlah_bayar?.toString() ?? '0');
 
     const pengeluaran =
       parseFloat(beliAyamAgg._sum.total_harga?.toString() ?? '0') +
-      parseFloat(pengeluaranDagingAgg._sum.pengeluaran?.toString() ?? '0') +
-      parseFloat(pengeluaranHidupAgg._sum.pengeluaran?.toString() ?? '0');
+      totalKerugianAyamMati;
 
     const saldo = pemasukan - pengeluaran;
 

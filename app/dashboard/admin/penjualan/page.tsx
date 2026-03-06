@@ -78,7 +78,7 @@ export default function PenjualanPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Riwayat Transaksi</h1>
-            <p className="text-sm text-muted-foreground">Transaksi penjualan yang sudah difinalisasi</p>
+            <p className="text-sm text-muted-foreground">Riwayat penjualan yang telah tercatat</p>
           </div>
         </div>
       </StaggerItem>

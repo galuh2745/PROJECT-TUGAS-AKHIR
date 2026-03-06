@@ -26,7 +26,6 @@ const labelMap: Record<string, string> = {
   'reset-requests': 'Permintaan Reset',
   'change-password': 'Ubah Password',
   penjualan: 'Penjualan',
-  draft: 'Transaksi Draft',
   piutang: 'Piutang',
   customer: 'Customer',
 };
@@ -73,11 +72,10 @@ export default function AdminNavbar() {
   const [belumAbsen, setBelumAbsen] = useState(0);
   const [totalKaryawan, setTotalKaryawan] = useState(0);
   const [resetRequests, setResetRequests] = useState<ResetRequestInfo[]>([]);
-  const [draftCount, setDraftCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const hasNotifications = belumAbsen > 0 || resetRequests.length > 0 || draftCount > 0;
+  const hasNotifications = belumAbsen > 0 || resetRequests.length > 0;
 
   useEffect(() => {
     setTodayDate(formatDate());
@@ -86,10 +84,9 @@ export default function AdminNavbar() {
       try {
         const today = new Date();
         const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const [dashRes, resetRes, draftRes] = await Promise.all([
+        const [dashRes, resetRes] = await Promise.all([
           fetch(`/api/dashboard/admin?tanggal=${dateStr}`, { credentials: 'include' }),
           fetch('/api/accounts/reset-requests', { credentials: 'include' }),
-          fetch('/api/penjualan/draft/count', { credentials: 'include' }),
         ]);
         if (dashRes.ok) {
           const json = await dashRes.json();
@@ -111,10 +108,6 @@ export default function AdminNavbar() {
             }));
             setResetRequests(names);
           }
-        }
-        if (draftRes.ok) {
-          const json = await draftRes.json();
-          if (json.success) setDraftCount(json.count || 0);
         }
       } catch { /* ignore */ }
     };
@@ -197,22 +190,6 @@ export default function AdminNavbar() {
                   <p className="text-sm font-semibold text-gray-800">Notifikasi</p>
                 </div>
                 <div className="py-1">
-                  {/* Draft Notifications */}
-                  {draftCount > 0 && (
-                    <div
-                      className="flex items-start gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => { setNotifOpen(false); router.push('/dashboard/admin/penjualan/draft'); }}
-                    >
-                      <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="text-orange-600 text-xs font-bold">{draftCount}</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Transaksi Draft</p>
-                        <p className="text-xs text-gray-400">{draftCount} transaksi menunggu finalisasi & cetak</p>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Absensi: Karyawan Belum Absen */}
                   {belumAbsen > 0 && (
                     <div

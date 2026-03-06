@@ -30,6 +30,7 @@ interface PemasukanDetail {
   penjualan_daging: number;
   penjualan_ayam_hidup: number;
   penjualan_campuran?: number;
+  pelunasan_piutang?: number;
   kas_masuk_penjualan?: number;
   kas_masuk_pelunasan?: number;
   total: number;
@@ -37,8 +38,6 @@ interface PemasukanDetail {
 
 interface PengeluaranDetail {
   beli_ayam: number;
-  operasional_daging: number;
-  operasional_ayam_hidup: number;
   kerugian_ayam_mati: number;
   total: number;
 }
@@ -165,11 +164,11 @@ function SummaryCards({
             </div>
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
               <div className="flex justify-between">
-                <span>Penjualan Daging</span>
+                <span>Saldo Daging</span>
                 <span className="font-medium">{formatRupiah(pemasukan.penjualan_daging)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Penjualan Ayam Hidup</span>
+                <span>Saldo Bersih Ayam Hidup</span>
                 <span className="font-medium">{formatRupiah(pemasukan.penjualan_ayam_hidup)}</span>
               </div>
               {(pemasukan.penjualan_campuran !== undefined && pemasukan.penjualan_campuran > 0) && (
@@ -178,16 +177,10 @@ function SummaryCards({
                   <span className="font-medium">{formatRupiah(pemasukan.penjualan_campuran)}</span>
                 </div>
               )}
-              {(pemasukan.kas_masuk_penjualan !== undefined && pemasukan.kas_masuk_penjualan > 0) && (
-                <div className="flex justify-between">
-                  <span>Kas Masuk Penjualan</span>
-                  <span className="font-medium">{formatRupiah(pemasukan.kas_masuk_penjualan)}</span>
-                </div>
-              )}
-              {(pemasukan.kas_masuk_pelunasan !== undefined && pemasukan.kas_masuk_pelunasan > 0) && (
+              {(pemasukan.pelunasan_piutang !== undefined && pemasukan.pelunasan_piutang > 0) && (
                 <div className="flex justify-between">
                   <span>Pelunasan Piutang</span>
-                  <span className="font-medium">{formatRupiah(pemasukan.kas_masuk_pelunasan)}</span>
+                  <span className="font-medium">{formatRupiah(pemasukan.pelunasan_piutang)}</span>
                 </div>
               )}
             </div>
@@ -209,14 +202,6 @@ function SummaryCards({
               <div className="flex justify-between">
                 <span>Beli Ayam</span>
                 <span className="font-medium">{formatRupiah(pengeluaran.beli_ayam)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Operasional Daging</span>
-                <span className="font-medium">{formatRupiah(pengeluaran.operasional_daging)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Operasional Ayam Hidup</span>
-                <span className="font-medium">{formatRupiah(pengeluaran.operasional_ayam_hidup)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Kerugian Ayam Mati</span>
