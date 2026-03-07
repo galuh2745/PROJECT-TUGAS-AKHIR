@@ -222,8 +222,9 @@ export default function UserDashboard() {
   }
 
   const absensi = data?.ringkasan.absensi_hari_ini;
-  const sudahMasuk = !!absensi?.jam_masuk || (data?.karyawan.skip_jam_kerja && !!absensi);
-  const sudahPulang = !!absensi?.jam_pulang;
+  const isIzinCutiRecord = absensi?.status === 'IZIN' || absensi?.status === 'CUTI';
+  const sudahMasuk = !isIzinCutiRecord && (!!absensi?.jam_masuk || (data?.karyawan.skip_jam_kerja && !!absensi));
+  const sudahPulang = !isIzinCutiRecord && !!absensi?.jam_pulang;
   const isSkipJamKerja = data?.karyawan.skip_jam_kerja || false;
 
   return (

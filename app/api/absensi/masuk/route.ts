@@ -225,10 +225,12 @@ export async function POST(req: Request) {
     if (isShiftMalam || isSkipJamKerja) {
       // Driver/Helper: cari absensi TERAKHIR yang belum checkout (tanpa batasan tanggal)
       // Shift malam: cek kemarin saja
+      // Exclude IZIN/CUTI karena record tersebut memang tidak punya jam_pulang
       const openAbsensi = await prisma.absensi.findFirst({
         where: {
           karyawan_id: karyawan.id,
           jam_pulang: null,
+          status: { notIn: ['IZIN', 'CUTI', 'ALPHA'] },
           ...(isSkipJamKerja ? {} : {
             tanggal: {
               gte: new Date(new Date(today).setUTCDate(today.getUTCDate() - 1)),
@@ -256,12 +258,14 @@ export async function POST(req: Request) {
     });
 
     if (existingAbsensi) {
-      return NextResponse.json({ success: false, error: 'Sudah melakukan check-in hari ini' }, { status: 400 });
+      // Jika record yang ada adalah IZIN atau CUTI, hapus agar karyawan bisa absen masuk (override)
+      if (existingAbsensi.status === 'IZIN' || existingAbsensi.status === 'CUTI') {
+        await prisma.absensi.delete({ where: { id: existingAbsensi.id } });
+        console.log(`Override izin/cuti: karyawan ${karyawan.nama} hadir pada tanggal ${todayStr}, record ${existingAbsensi.status} dihapus`);
+      } else {
+        return NextResponse.json({ success: false, error: 'Sudah melakukan check-in hari ini' }, { status: 400 });
+      }
     }
-
-    // Izin/cuti yang disetujui TIDAK memblokir absensi.
-    // Jika karyawan tetap masuk kerja, absensi diizinkan (override izin/cuti).
-    // Rekap bulanan akan menghitung berdasarkan record absensi yang ada.
 
     // Parse FormData
     const formData = await req.formData();
