@@ -60,6 +60,7 @@ export default function RiwayatAbsensiPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number; tanggal: string } | null>(null);
   const [filterTanggal, setFilterTanggal] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
 
   const fetchOptions = async () => {
     try {
@@ -112,7 +113,7 @@ export default function RiwayatAbsensiPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchRekapAbsensi(bulan, tahun, selectedKaryawan, selectedJenisKaryawan); }, [bulan, tahun, selectedKaryawan, selectedJenisKaryawan]);
 
-  const handleReset = () => { setBulan(new Date().getMonth() + 1); setTahun(new Date().getFullYear()); setSelectedKaryawan(''); setSelectedJenisKaryawan(''); setExpandedKaryawan(null); setFilterTanggal(''); };
+  const handleReset = () => { setBulan(new Date().getMonth() + 1); setTahun(new Date().getFullYear()); setSelectedKaryawan(''); setSelectedJenisKaryawan(''); setExpandedKaryawan(null); setFilterTanggal(''); setFilterStatus(''); };
 
   const handleExportPDF = async () => {
     try {
@@ -176,13 +177,23 @@ export default function RiwayatAbsensiPage() {
   } : summary;
 
   const summaryCards = displaySummary ? [
-    { label: 'Total Karyawan', value: displaySummary.total_karyawan, icon: Users, color: 'text-gray-600', bg: 'bg-gray-100' },
-    { label: 'Total Hadir', value: displaySummary.total_hadir, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { label: 'Total Terlambat', value: displaySummary.total_terlambat, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
-    { label: 'Total Izin', value: displaySummary.total_izin, icon: FileWarning, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { label: 'Total Cuti', value: displaySummary.total_cuti, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-100' },
-    { label: 'Total Alpha', value: displaySummary.total_alpha, icon: XCircle, color: 'text-red-600', bg: 'bg-red-100' },
+    { label: 'Total Karyawan', value: displaySummary.total_karyawan, icon: Users, color: 'text-gray-600', bg: 'bg-gray-100', filterKey: '' },
+    { label: 'Total Hadir', value: displaySummary.total_hadir, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100', filterKey: 'HADIR' },
+    { label: 'Total Terlambat', value: displaySummary.total_terlambat, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100', filterKey: 'TERLAMBAT' },
+    { label: 'Total Izin', value: displaySummary.total_izin, icon: FileWarning, color: 'text-blue-600', bg: 'bg-blue-100', filterKey: 'IZIN' },
+    { label: 'Total Cuti', value: displaySummary.total_cuti, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-100', filterKey: 'CUTI' },
+    { label: 'Total Alpha', value: displaySummary.total_alpha, icon: XCircle, color: 'text-red-600', bg: 'bg-red-100', filterKey: 'ALPHA' },
   ] : [];
+
+  // Filter displayData berdasarkan status yang dipilih
+  const filteredDisplayData = filterStatus
+    ? displayData.filter(item => {
+        if (filterStatus === 'ALPHA') {
+          return item.rekap.alpha > 0;
+        }
+        return item.detail.some(d => d.status === filterStatus);
+      })
+    : displayData;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -252,7 +263,22 @@ export default function RiwayatAbsensiPage() {
         <StaggerContainer className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {summaryCards.map((item) => (
             <StaggerItem key={item.label}>
-              <Card className="rounded-xl shadow-sm">
+              <Card
+                className={`rounded-xl shadow-sm transition-all duration-200 ${
+                  item.filterKey
+                    ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]'
+                    : ''
+                } ${
+                  filterStatus && filterStatus === item.filterKey
+                    ? 'ring-2 ring-offset-1 ring-current shadow-md scale-[1.02]'
+                    : ''
+                }`}
+                style={filterStatus && filterStatus === item.filterKey ? { '--tw-ring-color': item.color.includes('emerald') ? '#059669' : item.color.includes('amber') ? '#d97706' : item.color.includes('blue') ? '#2563eb' : item.color.includes('purple') ? '#9333ea' : item.color.includes('red') ? '#dc2626' : '#6b7280' } as React.CSSProperties : undefined}
+                onClick={() => {
+                  if (!item.filterKey) return;
+                  setFilterStatus(prev => prev === item.filterKey ? '' : item.filterKey);
+                }}
+              >
                 <CardContent className="pt-4 pb-4 px-4 flex items-center gap-3 min-h-[80px]">
                   <div className={`w-10 h-10 ${item.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
                     <item.icon className={`w-5 h-5 ${item.color}`} />
@@ -266,6 +292,20 @@ export default function RiwayatAbsensiPage() {
             </StaggerItem>
           ))}
         </StaggerContainer>
+      )}
+
+      {/* Active Filter Indicator */}
+      {filterStatus && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-600" />
+            <span className="text-amber-800 text-sm font-medium">Filter aktif: <span className="font-bold">{filterStatus}</span></span>
+            <span className="text-amber-600 text-xs">({filteredDisplayData.length} karyawan)</span>
+          </div>
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-amber-700 hover:text-amber-900" onClick={() => setFilterStatus('')}>
+            <X className="w-3 h-3 mr-1" />Hapus Filter
+          </Button>
+        </div>
       )}
 
       {/* Periode Info */}
@@ -310,12 +350,12 @@ export default function RiwayatAbsensiPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {displayData.length === 0 ? (
+                  {filteredDisplayData.length === 0 ? (
                     <tr><td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                       <ClipboardList className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <p>Tidak ada data absensi untuk periode ini</p>
+                      <p>{filterStatus ? `Tidak ada karyawan dengan status ${filterStatus}` : 'Tidak ada data absensi untuk periode ini'}</p>
                     </td></tr>
-                  ) : displayData.map((item) => (
+                  ) : filteredDisplayData.map((item) => (
                     <React.Fragment key={item.karyawan_id}>
                       <tr onClick={() => setExpandedKaryawan(expandedKaryawan === item.karyawan_id ? null : item.karyawan_id)} className="hover:bg-muted/50 cursor-pointer transition">
                         <td className="px-3 sm:px-6 py-3">
