@@ -35,13 +35,16 @@ export async function GET(req: Request) {
 
     addHeader(doc, 'LAPORAN BARANG MASUK', filterText || undefined);
 
-    const headers = ['No', 'Tanggal', 'Perusahaan', 'No DO', 'Kandang', 'Ekor', 'Kg', 'BW', 'Harga/Kg', 'Total Harga', 'Transfer', 'Saldo'];
+    const headers = ['No', 'Tanggal', 'Perusahaan', 'No DO', 'Kandang', 'Alamat Kandang', 'Nama Sopir', 'No Mobil', 'Ekor', 'Kg', 'BW', 'Harga/Kg', 'Total Harga', 'Transfer', 'Saldo'];
     const rows = data.map((item, i) => [
       (i + 1).toString(),
       new Date(item.tanggal_masuk).toLocaleDateString('id-ID'),
       item.perusahaan.nama_perusahaan,
       item.nomor_do || '-',
       item.nama_kandang,
+      item.alamat_kandang || '-',
+      item.nama_supir || '-',
+      item.no_mobil || '-',
       fmtNum(item.jumlah_ekor),
       parseFloat(item.total_kg.toString()).toFixed(1),
       (item.jumlah_ekor > 0 ? parseFloat(item.total_kg.toString()) / item.jumlah_ekor : 0).toFixed(3),
@@ -59,24 +62,24 @@ export async function GET(req: Request) {
       saldo: a.saldo + parseFloat(i.saldo_kita.toString()),
     }), { ekor: 0, kg: 0, harga: 0, transfer: 0, saldo: 0 });
 
-    rows.push(['', '', '', '', 'TOTAL', fmtNum(totals.ekor), totals.kg.toFixed(1), '', '', fmtRp(totals.harga), fmtRp(totals.transfer), fmtRp(totals.saldo)]);
+    rows.push(['', '', '', '', 'TOTAL', '', '', '', fmtNum(totals.ekor), totals.kg.toFixed(1), '', '', fmtRp(totals.harga), fmtRp(totals.transfer), fmtRp(totals.saldo)]);
 
     autoTable(doc, {
       head: [headers],
       body: rows,
       startY: filterText ? 43 : 37,
       theme: 'grid',
-      styles: { fontSize: 7, cellPadding: 2 },
+      styles: { fontSize: 6, cellPadding: 1.5 },
       headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold', halign: 'center' },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 10 },
-        5: { halign: 'right' },
-        6: { halign: 'right' },
-        7: { halign: 'right' },
+        0: { halign: 'center', cellWidth: 8 },
         8: { halign: 'right' },
         9: { halign: 'right' },
         10: { halign: 'right' },
         11: { halign: 'right' },
+        12: { halign: 'right' },
+        13: { halign: 'right' },
+        14: { halign: 'right' },
       },
       didParseCell: (d) => {
         if (d.row.index === rows.length - 1) {
